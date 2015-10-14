@@ -1,0 +1,1 @@
+http://localhost:8080/nw/opensearch?query={searchTerms}&start={startIndex}&hitsPerPage={count}&hitsPerSite={hitsPerSite}

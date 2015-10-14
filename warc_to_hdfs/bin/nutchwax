@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed
+# with this work for additional information regarding copyright
+# ownership.  The ASF licenses this file to You under the Apache
+# License, Version 2.0 (the "License"); you may not use this file
+# except in compliance with the License.  You may obtain a copy of the
+# License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.  See the License for the specific language governing
+# permissions and limitations under the License.
+
+
+# The following is cribbed from the 'nutch' script to ascertain the
+# location of Nutch so we can call its scripts.
+#
+# resolve links - $0 may be a softlink
+THIS="$0"
+while [ -h "$THIS" ]; do
+  ls=`ls -ld "$THIS"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '.*/.*' > /dev/null; then
+    THIS="$link"
+  else
+    THIS=`dirname "$THIS"`/"$link"
+  fi
+done
+
+THIS_DIR=`dirname "$THIS"`
+NUTCH_HOME=`cd "$THIS_DIR/.." ; pwd`
+
+# Now that we have NUTCH_HOME, process the command-line.
+
+case "$1" in
+  import)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.Importer "$@"
+    ;;  
+  import_to_hdfs)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.ImporterToHdfs "$@"
+    ;;
+  pagerankdb)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.PageRankDb "$@"
+    ;;
+  pagerankdbmerger)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.PageRankDbMerger "$@"
+    ;;
+  pageranker)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.tools.PageRanker "$@"
+    ;;
+  parsetextmerger)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.tools.ParseTextCombiner "$@"
+    ;;
+  add-dates)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.tools.DateAdder "$@"
+    ;;
+  index)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.Indexer "$@"
+    ;;
+  merge)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.IndexMerger "$@"
+    ;;
+  reboost)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.tools.LengthNormUpdater "$@"
+    ;;
+  dumpindex)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.archive.nutchwax.tools.DumpParallelIndex "$@"
+    ;;
+  search)
+    shift
+    ${NUTCH_HOME}/bin/nutch org.apache.nutch.searcher.NutchBean "$@"
+    ;;
+  *)
+    echo ""
+    echo "Usage: nutchwax COMMAND"
+    echo "where COMMAND is one of:"
+    echo "  import            Import ARCs into a new Nutch segment"
+    echo "  pagerankdb        Generate pagerankdb for a segment"
+    echo "  pagerankdbmerger  Merge multiple pagerankdbs"
+    echo "  pageranker        Generate pagerank.txt file from 'pagerankdb's or 'linkdb's"
+    echo "  parsetextmerger   Merge segement parse_text/part-nnnnn directories."
+    echo "  add-dates         Add dates to a parallel index"
+    echo "  index             Build Lucene index from segment(s) without crawl & linkdbs"
+    echo "  merge             Merge indexes or parallel indexes"
+    echo "  reboost           Update document boosts based on pagerank info"
+    echo "  dumpindex         Dump an index or set of parallel indices to stdout"
+    echo "  search            Query a search index"
+    echo ""
+    exit 1
+    ;;
+esac
+
+# Return the exit code of the command invoked.
+exit $?
