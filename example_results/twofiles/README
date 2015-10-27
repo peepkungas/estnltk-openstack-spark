@@ -1,0 +1,4 @@
+Two WARC files containing Estonian public web page crawls (originally 100MB each).
+Contains the SequenceFiles (encoded HTML content from WARCs), and outputs after applying estnltk processes to the SequenceFiles.
+out_twofiles : estnltk-processed outputs of both files.
+onepageexcerpt : values of a single page taken from the different output files. 
