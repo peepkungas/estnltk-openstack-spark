@@ -3,11 +3,15 @@ by Kaarel Tõnisson
 
 This program converts WARC archive files into Hadoop SequenceFiles for cluster usage. The program is built on NutchWAX, with a replaced Importer.  
 
+Build command (Javadoc errors, but succeeds):
+ant package
+
+
 Usage: Call ImporterToHdfs, simplified by calling
 	bin/nutchwax import_to_hdfs <manifestfile>
-where manifestfile is a file containing a path to a WARC file on each row.
+where manifestfile is a file containing a path to a WARC file on each row (exact file paths, wildcards and directories are not accepted).
 
-Output: SequenceFiles are written into folder sequencefiles, with each file containing content from one WARC. Non-text contect is discarded. Sequencefiles contain key-value pairs where:
+Output: SequenceFiles are written into directory sequencefiles, with each file containing content from one WARC. Non-text contect is discarded. Sequencefiles contain key-value pairs where:
 	key - domain::path::date
 	value - unprocessed HTML of the page
 SequenceFiles are in a compressed format and therefore are not human-readable.
@@ -17,5 +21,3 @@ nutchwax.importer.hdfs.seqfileprefix : Prefix string to be added to output files
 nutchwax.importer.hdfs.seqfilesuffix : Suffix string to be added to output files
 nutchwax.importer.hdfs.seqfilepath : Location where sequencefiles are output to 
 
-Build command (Javadoc errors, but succeeds):
-ant package
