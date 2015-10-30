@@ -10,7 +10,7 @@
   <!-- Add 'index-nutchwax' and 'query-nutchwax' to plugin list. -->
   <!-- Also, add 'parse-pdf' -->
   <!-- Remove 'urlfilter-regex' and 'normalizer-(pass|regex|basic)' -->
-  <value>protocol-http|parse-(text|html|warc-to-hdfs)|index-(nutchwax)|query-(basic|nutchwax)|summary-basic|scoring-nutchwax</value>
+  <value>protocol-http|parse-(text|html)|urlfilter-nutchwax-regex</value>
 </property>
 
 <!-- 
@@ -186,6 +186,30 @@
 </property>
 
 
+
+<property>
+  <name>nutchwax.urlfilter.regex.exclusions</name>
+  <value>conf/textonly-urlfilter.txt</value>
+  <description>Exclusion file for nutchwax-urlfilter-regex.</description>
+</property>
+
+<property>
+  <name>nutchwax.importer.hdfs.seqfileprefix</name>
+  <value>publicweb_</value>
+  <description>Prefix to be added to sequencefiles created by ImporterToHdfs.</description>
+</property>  
+
+<property>
+  <name>nutchwax.importer.hdfs.seqfilesuffix</name>
+  <value>.seq</value>
+  <description>Suffix to be added to sequencefiles created by ImporterToHdfs.</description>
+</property>
+
+<property>
+  <name>nutchwax.importer.hdfs.seqfilepath</name>
+  <value>./sequencefiles</value>
+  <description>Path to location where ImporterToHdfs outputs the sequencefiles.</description>
+</property>
 
 </configuration>
 

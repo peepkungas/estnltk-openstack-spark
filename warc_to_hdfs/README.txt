@@ -11,3 +11,11 @@ Output: SequenceFiles are written into folder sequencefiles, with each file cont
 	key - domain::path::date
 	value - unprocessed HTML of the page
 SequenceFiles are in a compressed format and therefore are not human-readable.
+
+Relevant nutch-site.xml configuration parameters:
+nutchwax.importer.hdfs.seqfileprefix : Prefix string to be added to output files
+nutchwax.importer.hdfs.seqfilesuffix : Suffix string to be added to output files
+nutchwax.importer.hdfs.seqfilepath : Location where sequencefiles are output to 
+
+Build command (Javadoc errors, but succeeds):
+ant package

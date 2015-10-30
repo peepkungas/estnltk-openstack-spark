@@ -114,6 +114,11 @@ public class ImporterToHdfs extends Configured implements Tool, Mapper<WritableC
   private int            interval;
   private HTTPStatusCodeFilter httpStatusCodeFilter;
 
+  private String seqFilePrefix;
+  private String seqFileSuffix;
+
+private String seqFilePath;
+
   /**
    * ?: Is this necessary?
    */
@@ -150,6 +155,10 @@ public class ImporterToHdfs extends Configured implements Tool, Mapper<WritableC
     this.interval    = jobConf.getInt( "db.fetch.interval.default", 2592000      );
 
     this.httpStatusCodeFilter = new HTTPStatusCodeFilter( jobConf.get( "nutchwax.filter.http.status" ) );
+    
+    this.seqFilePrefix = jobConf.get("nutchwax.importer.hdfs.seqfileprefix");
+    this.seqFileSuffix = jobConf.get("nutchwax.importer.hdfs.seqfilesuffix");
+    this.seqFilePath = jobConf.get("nutchwax.importer.hdfs.seqfilepath");
   }
 
   /**
@@ -209,10 +218,12 @@ public class ImporterToHdfs extends Configured implements Tool, Mapper<WritableC
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf); 
 
-		//TODO: extract only WARC name, not full path
-		String prefix = "pub_";
-		String arcfilename = prefix + arcUrl.substring(arcUrl.lastIndexOf("/")+1);
-		Path path = new Path("./sequencefiles/" + arcfilename);
+		//XXX : Rewritten to accomodate HDFS sequencefile writing
+		String prefix = seqFilePrefix;
+		String suffix = seqFileSuffix;
+		String outfilepath = seqFilePath;
+		String arcfilename = prefix + arcUrl.substring(arcUrl.lastIndexOf("/")+1) + suffix;
+		Path path = new Path(outfilepath + "/" + arcfilename);
 		Writer writer = SequenceFile.createWriter(fs, conf, path, 
 				new Text() .getClass(),
 				new Text() .getClass() );
