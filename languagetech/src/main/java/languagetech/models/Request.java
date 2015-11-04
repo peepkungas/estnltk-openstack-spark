@@ -4,19 +4,19 @@ public class Request {
 	String document;
 	String docUrl;
 	String mimeType;
-	String[] annotations;
+	String[] annotationSelectors;
 	
 	public Request(){
 		document="";
 		docUrl="";
 		mimeType="";
-		annotations=new String[10];
+		annotationSelectors=new String[10];
 	}
 	public Request(String d, String du, String mt, String[] a){
 		this.document=d;
 		this.docUrl=du;
 		this.mimeType=mt;
-		this.annotations=a;
+		this.annotationSelectors=a;
 	}
 	
 	public String getDocument(){
@@ -28,8 +28,8 @@ public class Request {
 	public String getMimeType() {
 		return mimeType;
 	}
-	public String[] getAnnotations() {
-		return annotations;
+	public String[] getAnnotationSelectors() {
+		return annotationSelectors;
 	}
 	
 	
