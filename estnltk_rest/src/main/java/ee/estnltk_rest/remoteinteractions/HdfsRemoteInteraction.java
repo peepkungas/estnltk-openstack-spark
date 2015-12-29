@@ -136,6 +136,7 @@ public class HdfsRemoteInteraction {
 		String command = "";
 		this.initRemote();
 		int returnCode;
+		sparkProcessPyLocation=config.getSparkProcessPyLocation();
 		Path hdfsDirectoryPath = inputSeqfileHdfsPath.getParent();
 		String inputFileName = inputSeqfileHdfsPath.getName().substring(0, inputSeqfileHdfsPath.getName().length()-4);
 		

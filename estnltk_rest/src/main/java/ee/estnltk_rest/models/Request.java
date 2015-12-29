@@ -1,29 +1,23 @@
 package ee.estnltk_rest.models;
 
 public class Request {
-	String document;
-	String docUrl;
+	String documentUrl;
 	String mimeType;
 	String[] annotationSelectors;
 	
 	public Request(){
-		document="";
-		docUrl="";
+		documentUrl="";
 		mimeType="";
 		annotationSelectors=new String[10];
 	}
 	public Request(String d, String du, String mt, String[] a){
-		this.document=d;
-		this.docUrl=du;
+		this.documentUrl=du;
 		this.mimeType=mt;
 		this.annotationSelectors=a;
 	}
 	
-	public String getDocument(){
-		return document;
-	}
-	public String getDocUrl() {
-		return docUrl;
+	public String getDocumentUrl() {
+		return documentUrl;
 	}
 	public String getMimeType() {
 		return mimeType;
