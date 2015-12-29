@@ -40,6 +40,11 @@ public class ServicesController {
 		String submitParams;
 		
 		service=Operations.getService(request.getRequestURI());
+		if(!Operations.providedServices.contains(service)){
+			return new ResponseEntity<String>("Error: The requested service is not available", 
+					HttpStatus.NOT_FOUND);
+		}
+			
 		documentReference=Operations.getDocReference(request.getRequestURI(), service);
 		hdfsRootDirectory=config.getHdfsDirectory();
 		fileOnHDFS=hdfsRootDirectory+documentReference+".seq";

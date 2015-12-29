@@ -8,7 +8,9 @@ public class Operations {
 	
 	public static final List<String> acceptableTypes= 
 			Arrays.asList(new String[]{"text/plain", "text/html", "text/sequence"});
-	
+	public static final List<String> providedServices= 
+			Arrays.asList(new String[]{"tokens", "lemmas", "pos-tags", "morph-analysis", "named-entities",
+					"text-contents"});
 	
 	public static String getDocReference(String requestURI, String service) {	
 		StringBuilder reference= new StringBuilder(requestURI.replace(service, ""));
