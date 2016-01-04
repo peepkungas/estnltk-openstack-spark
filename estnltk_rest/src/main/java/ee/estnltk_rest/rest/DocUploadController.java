@@ -2,6 +2,7 @@ package ee.estnltk_rest.rest;
 
 import java.io.IOException;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.http.HttpStatus;
@@ -30,7 +31,7 @@ public class DocUploadController {
 	
 	@RequestMapping("/uploads")
 	public ResponseEntity<String> uploadFile(@RequestBody Request request,
-			HttpServletResponse response) 
+			HttpServletResponse response, HttpServletRequest httpRequest) 
 			throws IOException, InterruptedException, JSchException{
 		
 		String inputFileType;
@@ -42,12 +43,12 @@ public class DocUploadController {
 		inputFileType=request.getMimeType();
 		if(inputFileType == null || inputFileType.trim().isEmpty()){
 			return new ResponseEntity<String>(new String("Message: Please specify document type in "
-					+ " the request body. Please check API description for document uploads."),
+					+ " the request body. Check API description for document uploads."),
 					HttpStatus.UNSUPPORTED_MEDIA_TYPE);
 		}
 		if(! Operations.acceptableTypes.contains(inputFileType)){
 			return new ResponseEntity<String>(new String("Message: Specified document type is not "
-					+ " supported by the service. Please check API description suported types."),
+					+ " supported by the service. Check API description suported types."),
 					HttpStatus.UNSUPPORTED_MEDIA_TYPE);
 		}
 		
@@ -60,8 +61,18 @@ public class DocUploadController {
 		cleanedInputUri = inputFileUri.replace("//", "/").replace(":", "").replace("?", "_").replace("=", "_");		
 		fileOnHDFS=config.getHdfsDirectory()+"/"+cleanedInputUri;
 		
-		/*TODO: Check if file already exist on HDFS and return 409-Conflict */
-				
+		/*Check if file already exist on HDFS and return 409-Conflict */
+		if(hdfsInteraction.isFileExist(fileOnHDFS+".seq")){
+			if(httpRequest.getHeader("overwrite")!=null && httpRequest.getHeader("overwrite").equals("yes")){
+				hdfsInteraction.removeFile(fileOnHDFS);
+				hdfsInteraction.removeFile(fileOnHDFS+".seq");				
+			}else{
+			return new ResponseEntity<String>(new String("Message: The file already exist. Please specify in request"
+					+ " header (overwrite=yes), if you want to overwrite the previous file."),
+					HttpStatus.CONFLICT);
+			}
+		}
+			
 		localHFDest= config.getLocalDirectory()+"/"+cleanedInputUri;
 		
 		hdfsInteraction.saveFromUriToRemoteHdfs(inputFileUri, localHFDest, fileOnHDFS);

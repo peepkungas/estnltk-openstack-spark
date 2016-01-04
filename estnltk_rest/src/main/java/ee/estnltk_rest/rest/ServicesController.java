@@ -66,33 +66,5 @@ public class ServicesController {
 		}catch(Exception ex){
 			return new ResponseEntity<String>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
-	}
-	
-	/*@RequestMapping(method = RequestMethod.POST, value = "/lemmas")
-	public ResponseEntity<String> lemma(HttpServletRequest request) 
-			throws IOException{
-		String hdfsRootDirectory;
-		String fileOnHDFS;
-		String submitParams;
-		
-		hdfsRootDirectory=config.getHdfsDirectory();
-		fileOnHDFS=hdfsRootDirectory+Operations.documentReference+".seq";
-		
-		Path hdfsPath= new Path(fileOnHDFS);
-		Map<String,String> services = new HashMap<String,String>();
-		services.put("-token", "token");			
-		submitParams=config.getSubmitParams();
-		String taskParams="";
-		String fileType="seq";
-		if (fileType != "html"){
-			taskParams += " -isPlaintextInput";
-		}
-		
-		try{			
-			Map<String, Path> path=hdfsInteraction.applyProcessAndGetResultLocation(hdfsPath, services, submitParams, taskParams);			
-			return new ResponseEntity<String>(path.get("out").toString(), HttpStatus.OK);
-		}catch(Exception ex){
-			return new ResponseEntity<String>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-		}
-	}*/
+	}	
 }

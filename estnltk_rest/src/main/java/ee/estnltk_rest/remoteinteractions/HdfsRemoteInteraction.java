@@ -6,9 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
@@ -64,7 +62,7 @@ public class HdfsRemoteInteraction {
 		
 		this.initRemote();
 		returnMsg = "NO_MSG";
-		
+		textToSeqJarLocation=config.getTextToSeqJarLocation();
 		Path inputTextLocalFSPath = new Path(localFSDest);
 		Path inputSeqfileLocalFSPath = new Path(inputTextLocalFSPath+".seq");
 		Path inputSeqfileHdfsPath = new Path(hdfsDest +".seq");
@@ -73,7 +71,7 @@ public class HdfsRemoteInteraction {
 		System.out.println("Remote seq HDFS dest: " + inputSeqfileHdfsPath);
 		
 		String command = "";
-		int returnCode;
+		String returnCode;
 		
 		command = "curl " + inputUri + " --create-dirs -o " + inputTextLocalFSPath;
 		System.out.println("command:" + command);
@@ -87,17 +85,26 @@ public class HdfsRemoteInteraction {
 		returnCode = executeCommandOnRemote(command);
 		System.out.println("return:" + returnCode);		
 			//   SHELL(hdfs) --  add from cluster local to cluster HDFS
-		command = "hadoop fs -mkdir -p " + inputSeqfileHdfsPath.getParent();
+		command = "hadoop dfs -mkdir -p " + inputSeqfileHdfsPath.getParent();
 		System.out.println("command:" + command);
 		returnCode = executeCommandOnRemote(command);
 		System.out.println("return:" + returnCode);
 		
-		command = "hadoop fs -put " + inputSeqfileLocalFSPath + " " + inputSeqfileHdfsPath;
+		command = "hadoop dfs -put " + inputSeqfileLocalFSPath + " " + inputSeqfileHdfsPath;
 		System.out.println("command:" + command);
 		returnCode = executeCommandOnRemote(command);
-		System.out.println("return:" + returnCode);		
+		System.out.println("return:" + returnCode);				
 		
-		//TODO: delete from local filesystem		
+		//delete from local file system
+		String seqFileRmString = Path.getPathWithoutSchemeAndAuthority(inputSeqfileLocalFSPath).toString();
+		
+		String crcFileRmString = Path.getPathWithoutSchemeAndAuthority(inputSeqfileLocalFSPath)
+				.getParent()+"/."+inputSeqfileLocalFSPath.getName()+".crc";
+		command = "rm " + seqFileRmString +" "+ crcFileRmString;
+		System.out.println("command:" + command);
+		returnCode = executeCommandOnRemote(command);
+		System.out.println("return:" + returnCode);
+				
 		returnMsg = "SUCCESS";
 		session.disconnect();
 		return inputSeqfileHdfsPath;
@@ -110,24 +117,44 @@ public class HdfsRemoteInteraction {
 	/*
 	 * Executes command on remote server via ssh.
 	 */
-	private int executeCommandOnRemote(String command) throws JSchException, IOException{		
+	private String executeCommandOnRemote(String command) throws JSchException, IOException{		
 		ChannelExec channelExec = (ChannelExec)session.openChannel("exec");
 		InputStream in = channelExec.getInputStream();
+
+		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+		
 		channelExec.setCommand(command);
 		channelExec.connect();
-		
-		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-		List<String> result = new ArrayList<String>();
+		String result = "";
 		String line;
 		while ((line = reader.readLine()) != null){
-			result.add(line);
-			System.out.println(line);
+			result+=line;
 		}
+		reader.close();
 		int exitStatus = channelExec.getExitStatus();
 		channelExec.disconnect();
+		
+		return result;
+	}
+	private int executeCommand(String command) 
+			throws JSchException, IOException{		
+		ChannelExec channelExec = (ChannelExec)session.openChannel("exec");
+		InputStream in = channelExec.getInputStream();
 
+		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+		
+		channelExec.setCommand(command);
+		channelExec.connect();
+		String result = "";
+		String line;
+		while ((line = reader.readLine()) != null){
+			result+=line;
+		}
+		reader.close();
+		int exitStatus = channelExec.getExitStatus();
+		channelExec.disconnect();	
 		return exitStatus;
-	}	
+	}
 	
 	/*
 	 * Applies ESTNLTK Spark processing on the input file in HDFS.
@@ -135,8 +162,9 @@ public class HdfsRemoteInteraction {
 	public Map<String, Path> applyProcessAndGetResultLocation(Path inputSeqfileHdfsPath, Map<String, String> estnltkOpMap, String submitParams, String taskParams) throws JSchException, IOException {
 		String command = "";
 		this.initRemote();
-		int returnCode;
+		String returnCode;
 		sparkProcessPyLocation=config.getSparkProcessPyLocation();
+		textToSeqJarLocation=config.getTextToSeqJarLocation();
 		Path hdfsDirectoryPath = inputSeqfileHdfsPath.getParent();
 		String inputFileName = inputSeqfileHdfsPath.getName().substring(0, inputSeqfileHdfsPath.getName().length()-4);
 		
@@ -175,44 +203,52 @@ public class HdfsRemoteInteraction {
 		// return location(s) map of results
 		return outputFileFinalHdfsPathMap;
 	}
-	
-	/*public void runFullProcess(String fileuri, String fileType, String[] services) 
-			throws JSchException, IOException, InterruptedException{		
+	public boolean removeFile(String p) throws JSchException, IOException{
+		Path inputSeqfileHdfsPath=new Path(p);
+		String command="";
+		int returnCode;
 		
-			//watch out for script injection (purify URI beforehand)
-			//remove trailing "/"-symbol
-//		String inputUri = "http://textfiles.com/games/abbrev.txt";
-		String inputUri = fileuri;//"http://www.cs.ut.ee/et/teadus/uurimisruhmad";
-		String localFSDest = "file://" + localdir + "/" + cleanedInputUri; //into the server local file system
-		String hdfsDest = "hdfs://"+ hdfsdir + "/" + cleanedInputUri;		//into the hdfs
-		String type = fileType;//"html";
-		String submitParams = "--master yarn-cluster --num-executors 4";
-		String taskParams = "";
-		Map<String,String> estnltkOpMap = new HashMap<String,String>();
-		for(String service: services)
-			estnltkOpMap.put("-".concat(service), service);//("-lemma","lemma"); 
-		//estnltkOpMap.put("-ner","ner");
+		this.initRemote();
 		
-		// construct Spark process params
-		if (type != "html"){
-			taskParams += " -isPlaintextInput";
+		command = "hadoop fs -rm " + inputSeqfileHdfsPath;
+		System.out.println("command:" + command);
+		returnCode = executeCommand(command);
+		System.out.println("return:" + returnCode);
+		if (returnCode > 0){
+			return true;
 		}
+		//hdfs dfs -rmr /user/hadoop/dir
+		return false;
+	}
+	public boolean isFileExist(String p) 
+			throws JSchException, IOException{
 		
+		Path inputSeqfileHdfsPath=new Path(p);
+		String command="";
+		String returnValue;
+		this.initRemote();
 		
-
-		// Save from input URI to HDFS, get HDFS location
-		Path hdfsPath = null;		
-		session.connect();
-
-		hdfsPath = saveFromUriToRemoteHdfs(inputUri, localFSDest, hdfsDest);
-
-		System.out.println("SEQFILE LOC: " + hdfsPath);
-
-		// Apply ESTNLTK processes to seqfile, get result location
-		Map<String, Path> processResultLocationsMap = applyProcessAndGetResultLocation(hdfsPath, estnltkOpMap, submitParams, taskParams);
-		System.out.println("OUTMAP: "+ processResultLocationsMap);
-		session.disconnect(); //closes session, needs reinitializing before reopen?
-		
-	}*/
+		command = "hadoop fs -ls " + inputSeqfileHdfsPath;
+		System.out.println("command:" + command);
+		returnValue = executeCommandOnRemote(command);
+		System.out.println("return:" + returnValue);
+		if (returnValue.length() > 0){
+			System.out.println("INFO: Seqfile already exists in HDFS, skipping to processing.");
+			return true;
+			//return inputSeqfileHdfsPath;
+		}
+		/*
+		if(toCheck.equals("dir"))
+			command="hdfs dfs -test -d "+path.getParent();
+		else if(toCheck.equals("file"))
+			command="hdfs dfs -test -e "+path.getParent();
+		System.out.println(command);
+		int code=this.executeCommandOnRemote(command);
+		System.out.println(code);
+		//session.disconnect();
+		if(code<0)
+			return false;*/
+		return false;
+	}
 }
 
