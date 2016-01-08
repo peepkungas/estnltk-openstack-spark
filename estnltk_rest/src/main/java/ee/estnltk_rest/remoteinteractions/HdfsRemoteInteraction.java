@@ -8,7 +8,6 @@ import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.hadoop.fs.Path;
 
 import com.jcraft.jsch.ChannelExec;
@@ -41,7 +40,6 @@ public class HdfsRemoteInteraction {
 		this.session = session;
 	}
 	private void initRemote() throws JSchException{
-		// init class fields
 		try {
 			init();
 			this.session.connect();
@@ -57,9 +55,9 @@ public class HdfsRemoteInteraction {
 	 * Downloads the inputUri to remote local file system, converts it to Hadoop sequencefile, then copies it from local to HDFS.
 	 * returns: Path to sequencefile in HDFS if successful 
 	 */
-	public Path saveFromUriToRemoteHdfs(String inputUri, String localFSDest, String hdfsDest) 
-			throws IOException, JSchException{
-		
+	public String saveFromUriToRemoteHdfs(String inputUri, String localFSDest, String hdfsDest) 
+			 {
+		try{
 		this.initRemote();
 		returnMsg = "NO_MSG";
 		textToSeqJarLocation=config.getTextToSeqJarLocation();
@@ -106,9 +104,18 @@ public class HdfsRemoteInteraction {
 		System.out.println("return:" + returnCode);
 				
 		returnMsg = "SUCCESS";
+		}catch(IOException e){
+			returnMsg="IOException";
+		}
+		catch(JSchException e){
+			returnMsg="JSchException";
+		}
+		catch (Exception e){
+			returnMsg="Exception";
+		}		
 		session.disconnect();
-		return inputSeqfileHdfsPath;
-	}
+		return returnMsg;
+	}	
 	
 	public String getReturnMsg(){
 		return returnMsg;
@@ -131,7 +138,7 @@ public class HdfsRemoteInteraction {
 			result+=line;
 		}
 		reader.close();
-		int exitStatus = channelExec.getExitStatus();
+		//int exitStatus = channelExec.getExitStatus();
 		channelExec.disconnect();
 		
 		return result;
@@ -145,11 +152,11 @@ public class HdfsRemoteInteraction {
 		
 		channelExec.setCommand(command);
 		channelExec.connect();
-		String result = "";
+		/*String result = "";
 		String line;
 		while ((line = reader.readLine()) != null){
 			result+=line;
-		}
+		}*/
 		reader.close();
 		int exitStatus = channelExec.getExitStatus();
 		channelExec.disconnect();	
@@ -203,6 +210,40 @@ public class HdfsRemoteInteraction {
 		// return location(s) map of results
 		return outputFileFinalHdfsPathMap;
 	}
+	public String readResult(String hdfsDest) 
+			throws IOException, JSchException{
+		//String returnValue;
+		String command;
+		this.initRemote();
+		command = "hadoop fs -text "+hdfsDest;
+		System.out.println("command:" + command);
+		return executeCommandOnRemote(command);
+		
+		/*String line;
+		InputStream stream = null;
+		try{
+			this.initRemote();
+			
+			Channel channel = session.openChannel("sftp");
+			channel.connect();			
+			ChannelSftp sftp = (ChannelSftp) channel;
+			System.out.println("Home: "+sftp.getHome());
+			stream = sftp.get(hdfsDest);
+			BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
+			
+			while ((line = reader.readLine()) != null){
+				result+=line;
+			}		
+			//System.out.println("return:" + returnValue);
+		}catch(Exception e){
+			System.out.println(e.getMessage());
+		}finally{
+			if(stream!=null)
+				stream.close();
+		}*/
+		//return result;
+	}
+	
 	public boolean removeFile(String p) throws JSchException, IOException{
 		Path inputSeqfileHdfsPath=new Path(p);
 		String command="";
@@ -229,25 +270,10 @@ public class HdfsRemoteInteraction {
 		this.initRemote();
 		
 		command = "hadoop fs -ls " + inputSeqfileHdfsPath;
-		System.out.println("command:" + command);
 		returnValue = executeCommandOnRemote(command);
-		System.out.println("return:" + returnValue);
 		if (returnValue.length() > 0){
-			System.out.println("INFO: Seqfile already exists in HDFS, skipping to processing.");
 			return true;
-			//return inputSeqfileHdfsPath;
-		}
-		/*
-		if(toCheck.equals("dir"))
-			command="hdfs dfs -test -d "+path.getParent();
-		else if(toCheck.equals("file"))
-			command="hdfs dfs -test -e "+path.getParent();
-		System.out.println(command);
-		int code=this.executeCommandOnRemote(command);
-		System.out.println(code);
-		//session.disconnect();
-		if(code<0)
-			return false;*/
+		}		
 		return false;
 	}
 }

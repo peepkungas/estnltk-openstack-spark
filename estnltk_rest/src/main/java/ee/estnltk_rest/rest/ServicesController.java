@@ -60,11 +60,29 @@ public class ServicesController {
 		}
 		
 		try{			
-			Map<String, Path> path=hdfsInteraction.applyProcessAndGetResultLocation(hdfsPath, services, submitParams, taskParams);			
-			/*Read and write the processed file and return it.*/
-			return new ResponseEntity<String>(path.get("out").toString(), HttpStatus.OK);
+			hdfsInteraction.applyProcessAndGetResultLocation(hdfsPath, services, submitParams, taskParams);
+			return new ResponseEntity<String>("Service Initiated.", HttpStatus.OK);
 		}catch(Exception ex){
 			return new ResponseEntity<String>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
 		}
-	}	
+	}
+	
+	@RequestMapping(method = RequestMethod.GET, value = "/**/results")
+	public ResponseEntity<String> getResults(HttpServletRequest request) 
+			throws IOException{
+		String documentReference;
+		String hdfsRootDirectory;
+		String resultFileOnHDFS;
+		
+		documentReference=Operations.getDocReference(request.getRequestURI(), "results");
+		hdfsRootDirectory=config.getHdfsDirectory();
+		resultFileOnHDFS=hdfsRootDirectory+documentReference+".result";			
+		
+		try{			
+			String result=hdfsInteraction.readResult(resultFileOnHDFS);
+			return new ResponseEntity<String>(result, HttpStatus.OK);
+		}catch(Exception ex){
+			return new ResponseEntity<String>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
 }

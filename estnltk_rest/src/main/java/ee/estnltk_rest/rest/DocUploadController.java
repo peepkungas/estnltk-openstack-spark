@@ -54,32 +54,32 @@ public class DocUploadController {
 		
 		inputFileUri=request.getDocumentUrl();		
 		if(inputFileUri==null || inputFileUri.trim().isEmpty()){
-			return new ResponseEntity<String>(new String("Message: Please provide a valid address for  "
-					+ "document to upload."),
+			return new ResponseEntity<String>(new String("Message: File not Found. "
+					+ "Please provide a valid address for document to upload."),
 					HttpStatus.NOT_FOUND);
 		}
+		if(!Operations.isRemoteFileExits(inputFileUri)){
+			return new ResponseEntity<String>(new String("Message: File not Found. "
+					+ "Please check if file exist on the given URI."),
+					HttpStatus.NOT_FOUND);
+		}
+		
 		cleanedInputUri = inputFileUri.replace("//", "/").replace(":", "").replace("?", "_").replace("=", "_");		
 		fileOnHDFS=config.getHdfsDirectory()+"/"+cleanedInputUri;
 		
 		/*Check if file already exist on HDFS and return 409-Conflict */
 		if(hdfsInteraction.isFileExist(fileOnHDFS+".seq")){
-			if(httpRequest.getHeader("overwrite")!=null && httpRequest.getHeader("overwrite").equals("yes")){
-				hdfsInteraction.removeFile(fileOnHDFS);
-				hdfsInteraction.removeFile(fileOnHDFS+".seq");				
-			}else{
-			return new ResponseEntity<String>(new String("Message: The file already exist. Please specify in request"
-					+ " header (overwrite=yes), if you want to overwrite the previous file."),
+			return new ResponseEntity<String>(new String("Message: File already exist."),
 					HttpStatus.CONFLICT);
-			}
 		}
-			
 		localHFDest= config.getLocalDirectory()+"/"+cleanedInputUri;
 		
 		hdfsInteraction.saveFromUriToRemoteHdfs(inputFileUri, localHFDest, fileOnHDFS);
 		
 		if(hdfsInteraction.getReturnMsg().equals("SUCCESS")){
 			response.addHeader("Reference", cleanedInputUri);
-        	return new ResponseEntity<String>("Message: The file is uploaded Successfully.", 
+        	return new ResponseEntity<String>("Message: The file is uploaded Successfully. "
+        			+ "The document reference sent in header.", 
         			HttpStatus.OK);
 		}
         else{
