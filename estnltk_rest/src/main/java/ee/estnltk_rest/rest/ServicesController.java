@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 
+
+
+
+import com.jcraft.jsch.JSchException;
+
 import ee.estnltk_rest.configurations.RemoteServerConfig;
 import ee.estnltk_rest.remoteinteractions.HdfsRemoteInteraction;
 import ee.estnltk_rest.utils.Operations;
@@ -32,7 +37,7 @@ public class ServicesController {
 	
 	@RequestMapping(method = RequestMethod.POST, value = "/**/*")
 	public ResponseEntity<String> tokenization(HttpServletRequest request) 
-			throws IOException{
+			throws IOException, JSchException{
 		String documentReference;
 		String service;
 		String hdfsRootDirectory;
@@ -46,38 +51,53 @@ public class ServicesController {
 		}
 			
 		documentReference=Operations.getDocReference(request.getRequestURI(), service);
+		if(documentReference==null || documentReference.trim().isEmpty()){			
+			return new ResponseEntity<String>(new String("Error: Document reference not speicified."),
+					HttpStatus.BAD_REQUEST);
+		}
+		
 		hdfsRootDirectory=config.getHdfsDirectory();
 		fileOnHDFS=hdfsRootDirectory+documentReference+".seq";
-		
+		if(!hdfsInteraction.isFileExist(fileOnHDFS, "remote")){
+			return new ResponseEntity<String>(new String("Error: Document not found."),
+					HttpStatus.NOT_FOUND);
+		}
 		Path hdfsPath= new Path(fileOnHDFS);
-		Map<String,String> services = new HashMap<String,String>();
+		
+		service=Operations.sparkAcceptableServices[Operations.providedServices.indexOf(service)];
+		Map<String,String> services = new HashMap<String,String>();		
 		services.put("-"+service, service);			
 		submitParams=config.getSubmitParams();
-		String taskParams="";
 		String fileType="seq";
-		if (fileType != "html"){
-			taskParams += " -isPlaintextInput";
-		}
+				
+		Runnable myrunnable = new Runnable() {
+		    public void run() {
+		    	hdfsInteraction.applyProcessAndGetResultLocation(hdfsPath, services, submitParams, fileType);
+		    }
+		};
+		new Thread(myrunnable).start();					
+		return new ResponseEntity<String>("Message: Service Initiated.", HttpStatus.OK);
 		
-		try{			
-			hdfsInteraction.applyProcessAndGetResultLocation(hdfsPath, services, submitParams, taskParams);
-			return new ResponseEntity<String>("Service Initiated.", HttpStatus.OK);
-		}catch(Exception ex){
-			return new ResponseEntity<String>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-		}
 	}
 	
 	@RequestMapping(method = RequestMethod.GET, value = "/**/results")
 	public ResponseEntity<String> getResults(HttpServletRequest request) 
-			throws IOException{
+			throws IOException, JSchException{
 		String documentReference;
 		String hdfsRootDirectory;
 		String resultFileOnHDFS;
 		
 		documentReference=Operations.getDocReference(request.getRequestURI(), "results");
+		if(documentReference==null || documentReference.trim().isEmpty()){			
+			return new ResponseEntity<String>(new String("Error: Document reference not speicified."),
+					HttpStatus.BAD_REQUEST);
+		}
 		hdfsRootDirectory=config.getHdfsDirectory();
 		resultFileOnHDFS=hdfsRootDirectory+documentReference+".result";			
-		
+		if(!hdfsInteraction.isFileExist(resultFileOnHDFS, "remote")){
+			return new ResponseEntity<String>(new String("Error: Results for specified document not found."),
+					HttpStatus.NOT_FOUND);
+		}
 		try{			
 			String result=hdfsInteraction.readResult(resultFileOnHDFS);
 			return new ResponseEntity<String>(result, HttpStatus.OK);
