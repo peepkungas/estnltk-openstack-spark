@@ -6,10 +6,10 @@ Output of spark_estnltk -ner process consisting of key-value pairs, where value 
 
 Comma delimmited CSV file, which contains full list of name entities which should be recognized. 
 
-- <inputPath> - Path to the folder/file containing output of spark_estnltk -ner process
-- <csvFilePath> - Path to the file containing entity entries
+- [inputPath] - Path to the folder/file containing output of spark_estnltk -ner process
+- [csvFilePath] - Path to the file containing entity entries
 
-spark-submit --master local[4] estlinkSpark.py <inputPath> <csvFilePath>
+spark-submit --master local[4] estlinkSpark.py [inputPath] [csvFilePath]
 
 For the sample run lcoal files can be used.
 spark-submit --master local[4] estlinkSpark.py part-00000 spark-input-example.csv
