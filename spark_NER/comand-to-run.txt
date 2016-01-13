@@ -1,0 +1,17 @@
+
+#spark downloaded from http://spark.apache.org/downloads.html
+# Should be prebuild for hadoop version x.x (im using 1.1.0 for cluster compability)
+#unpacked to some folder in filesystem (mine is ~/programs/spark-1.1.0-bin-hadoop1)
+
+
+#command to run:
+# input file locations hardcoded 
+# location to run should be in folder where estlinkSpark.py  and all the input files are located
+# probably have to also create a folder named "out" in the same folder
+
+spark-submit --master local[4] estlinkSpark.py <inputPath> <csvFilePath>
+
+<inputPath> - Path to the folder/file containing output of spark_estnltk -ner process output
+<csvFilePath> - Path to the file containing entity entries
+
+
