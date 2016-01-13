@@ -11,6 +11,9 @@ Comma delimmited CSV file, which contains full list of name entities which shoul
 
 spark-submit --master local[4] estlinkSpark.py <inputPath> <csvFilePath>
 
+For the sample run lcoal files can be used.
+spark-submit --master local[4] estlinkSpark.py part-00000 spark-input-example.csv
+
 
 
 
