@@ -18,7 +18,7 @@ def parseData(line):
     # y - dictionary
     # y['named_entity_labels'] - list of labels
     # y['named_entities'] - list if entity strings
-    # when y - dictionary, is empty it contains "NO_TEXT", this entries are filtered out 
+    # when y - dictionary, is empty it contains "NO_TEXT", this entries are filtered out
     if y == "NO_TEXT":
         return None
     return x, y
@@ -47,13 +47,9 @@ def filterEntities(line):
     entlab, keys = grouped
     entity, label = entlab
     # did not label all the fields here
-    # even though the invalid lines are filtered out on the previous stage. Just a safety net. 
+    # even though the invalid lines are filtered out on the previous stage. Just a safety net.
     try:
         b0, b1, b2, b3, b4, b5, b6, b7, b8 = entities
-
-        #return False if personal id code is incorrect
-        if("," in b0):
-            return False  
         # some issues with strings containing \" or \' characters
         b1 = b1.replace("\"", "")
         b1 = b1.replace("\'", "")
@@ -79,10 +75,12 @@ def filterEntities(line):
             # the company identifier string contains vector of company names "General motors|General motors LIMITED". Therefore this approach should be suffcient
         if (b5 in entity):
             return True
-        # otherwise filter the entry out
-        return False
+
     except ValueError:
-        return False  
+        return False
+    # otherwise filter the entry out
+    return False
+
 
 def cleanResult(line):
     results = []
@@ -155,4 +153,3 @@ if __name__ == "__main__":
     endTime = time.clock()
     print "Time to finish tuned: 0.066288"
     print "Time to finish:" + str(endTime - startTime)
-
