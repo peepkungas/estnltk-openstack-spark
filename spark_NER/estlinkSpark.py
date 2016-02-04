@@ -9,7 +9,15 @@ import estnltk
 import random
 import ast
 import time
+import re
 
+def isPersonIdIlligal(id):
+    #check whether 'id' contains ANY invalid characters: letters, basic punctuation signs
+    id = id.replace("\"","")
+    pattern = re.compile("[\W\D]")
+    if(len(id)!=11 or pattern.match(id)):
+        return False
+    return True
 
 def parseData(line):
     x, y = ast.literal_eval(line)
@@ -35,9 +43,10 @@ def explodeEntries(line):
 
 def parseEntities(line):
     # split values by comma which represents separator and assign them into a tuple.
-    values = line.split("\",\"")
+    values = line.split(",")
     # discard lines which contain less than nine columns
-    if (len(values) != 9):
+    print values
+    if(len(values) != 9 or "," in values[0] or values[1]== '""' or values[2] == '""' or values[5] == '""'):
         return None
     return tuple(values)
 
@@ -46,20 +55,17 @@ def filterEntities(line):
     grouped, entities = line
     entlab, keys = grouped
     entity, label = entlab
-    # did not label all the fields here
     # even though the invalid lines are filtered out on the previous stage. Just a safety net. 
     try:
         b0, b1, b2, b3, b4, b5, b6, b7, b8 = entities
 
-        #return False if personal id code is incorrect
-        if("," in b0):
-            return False  
         # some issues with strings containing \" or \' characters
         b1 = b1.replace("\"", "")
         b1 = b1.replace("\'", "")
         b2 = b2.replace("\"", "")
         b2 = b2.replace("\'", "")
-
+        b5 = b5.replace("\"", "")
+        b5 = b5.replace("\'", "")
         # print aaa.encode('utf-8').strip(), "-" ,b1.encode('utf-8').strip(), "-",b2.encode('utf-8').strip(), "\n\n"
 
         # currently just checking whether first and last names or the company name is contained in the entity string
@@ -93,9 +99,12 @@ def cleanResult(line):
 
     # did not label all the fields here
     b0, b1, b2, b3, b4, b5, b6, b7, b8 = entities
-
-    for key in keys:
-        results.append((key, entity, b0, b1, b2, b3))
+    if label == "PER":
+        for key in keys:
+            results.append((key, entity, b0, b1, b2, b3, label))
+    else:
+        for key in keys:
+            results.append((key, entity, b4, b5, label))
     return results
 
 
@@ -155,4 +164,3 @@ if __name__ == "__main__":
     endTime = time.clock()
     print "Time to finish tuned: 0.066288"
     print "Time to finish:" + str(endTime - startTime)
-
