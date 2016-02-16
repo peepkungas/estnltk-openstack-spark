@@ -1,0 +1,11 @@
+--Load the file or the folder with files
+data = LOAD '/user/hadoop/pig_data/out_5210/part-00000' AS (line:chararray);
+--Tuple sizes are different therefore have to split it manually
+data = foreach data generate FLATTEN(STRSPLIT($0, '\\,'));
+--Group data by the mentioned entity
+grouped = group data by $1;
+--Count statistics
+data = FOREACH grouped GENERATE COUNT(data), data;
+DUMP data;
+
+--STORE data INTO 'statistics/data_output'
