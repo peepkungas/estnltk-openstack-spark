@@ -1,0 +1,47 @@
+
+- hosts: master
+  sudo: yes
+
+  tasks:
+  - name: "Dissable Firewall"
+    ufw: state=disabled
+  - name: "Disable IPv6 - 1"
+    lineinfile: dest=/etc/sysctl.conf line="{{ disable_ipv6_1 }}" state=present
+  - name: "Disable IPv6 - 2"
+    lineinfile: dest=/etc/sysctl.conf line="{{ disable_ipv6_2 }}" state=present
+  - name: "Disable IPv6 - 3"
+    lineinfile: dest=/etc/sysctl.conf line="{{ disable_ipv6_3 }}" state=present
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_1 }}$' line="{{ hadoop_ner_ip_1 }} {{ hadoop_ner_1 }}" state=present
+    with_items: groups['all']
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_2 }}$' line="{{ hadoop_ner_ip_2 }} {{ hadoop_ner_2 }}" state=present
+    with_items: groups['all']
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_3 }}$' line="{{ hadoop_ner_ip_3 }} {{ hadoop_ner_3 }}" state=present
+    with_items: groups['all']
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_4 }}$' line='{{ hadoop_ner_ip_4 }} {{ hadoop_ner_4 }}' state=present
+    with_items: groups['all']
+  - file: path=/opt/cloudera-manager state=directory owner=www-data group=www-data
+
+  - name: Disable firewall
+    shell: ufw disable
+
+  - name: Get cloudera manager installer
+    get_url: url=http://archive.cloudera.com/cm5/installer/latest/cloudera-manager-installer.bin dest=/opt/cloudera-manager/cloudera-manager-installer.bin
+  - file: path=/opt/cloudera-manager/cloudera-manager-installer.bin state=touch mode="u+x"
+
+  vars:
+    hadoop_ner_1: "hadoop-ner-1"
+    hadoop_ner_ip_1: "192.168.2.85"
+    hadoop_ner_2: "hadoop-ner-2"
+    hadoop_ner_ip_2: "192.168.2.86"
+    hadoop_ner_3: "hadoop-ner-3"
+    hadoop_ner_ip_3: "192.168.2.87"
+    hadoop_ner_4: "hadoop-ner-4"
+    hadoop_ner_ip_4: "192.168.2.88"
+    disable_ipv6_1: "net.ipv6.conf.all.disable_ipv6 = 1"
+    disable_ipv6_2: "net.ipv6.conf.default.disable_ipv6 = 1"
+    disable_ipv6_3: "net.ipv6.conf.lo.disable_ipv6 = 1"
+

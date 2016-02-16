@@ -1,0 +1,121 @@
+
+- hosts: master
+  sudo: yes
+
+  tasks:
+  - name: "Dissable Firewall"
+    ufw: state=disabled
+  - name: "Disable IPv6 - 1"
+    lineinfile: dest=/etc/sysctl.conf line="{{ disable_ipv6_1 }}" state=present
+  - name: "Disable IPv6 - 2"
+    lineinfile: dest=/etc/sysctl.conf line="{{ disable_ipv6_2 }}" state=present
+  - name: "Disable IPv6 - 3"
+    lineinfile: dest=/etc/sysctl.conf line="{{ disable_ipv6_3 }}" state=present
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_1 }}$' line="{{ hadoop_ner_ip_1 }} {{ hadoop_ner_1 }}" state=present
+    with_items: groups['all']
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_2 }}$' line="{{ hadoop_ner_ip_2 }} {{ hadoop_ner_2 }}" state=present
+    with_items: groups['all']
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_3 }}$' line="{{ hadoop_ner_ip_3 }} {{ hadoop_ner_3 }}" state=present
+    with_items: groups['all']
+  - name: "Build hosts file"
+    lineinfile: dest=/etc/hosts regexp='.*{{ hadoop_ner_4 }}$' line='{{ hadoop_ner_ip_4 }} {{ hadoop_ner_4 }}' state=present
+    with_items: groups['all']
+  - file: path=/opt/cloudera-manager state=directory owner=www-data group=www-data
+
+  - name: Disable firewall
+    shell: ufw disable
+
+  - name: add CDH 5 repository
+    get_url: url=http://archive.cloudera.com/cm5/ubuntu/trusty/amd64/cm/cloudera.list dest=/etc/apt/sources.list.d/cloudera.list
+  - name: key update
+    shell: apt-key update
+  - name: repository update
+    shell: apt-get update
+
+  - name: install java
+    action: apt pkg=openjdk-7-jdk state=latest force=yes
+
+  - name: Cloudera Manager Server Packages
+    action: apt pkg=$item state=latest force=yes
+    with_items:
+    - cloudera-manager-daemons
+    - cloudera-manager-server
+
+  - name: Cloudera Manager Server Embedded Database
+    action: apt pkg=$item state=latest force=yes
+    with_items:
+    - cloudera-manager-server-db-2
+
+  - name: Cloudera Manager Agent Packages
+    action: apt pkg=$item state=latest force=yes
+    with_items:
+    - cloudera-manager-agent
+    - cloudera-manager-daemons
+
+  - name: Get CDH 5 repository
+    get_url: url=http://archive.cloudera.com/cdh5/one-click-install/trusty/amd64/cdh5-repository_1.0_all.deb dest=/opt/cloudera-manager/cdh5-repository_1.0_all.deb
+  - name: Add CDH 5 reopisotry
+    shell: dpkg -i /opt/cloudera-manager/cdh5-repository_1.0_all.deb
+  - name: update reopsitory
+    shell: apt-get update
+  - name: Install CDH and Managed Service Packages
+    action: apt pkg=$item state=latest force=yes
+    with_items:
+    - avro-tools
+    - crunch
+    - flume-ng
+    - hadoop-hdfs-fuse
+    - hadoop-hdfs-nfs3
+    - hadoop-httpfs
+    - hadoop-kms
+    - hbase-solr
+    - hive-hbase
+    - hive-webhcat
+    - hue-beeswax
+    - hue-hbase
+    - hue-impala
+    - hue-pig
+    - hue-plugins 
+    - hue-rdbms
+    - hue-search
+    - hue-spark
+    - hue-sqoop
+    - hue-zookeeper
+    - impala 
+    - impala-shell 
+    - kite 
+    - llama 
+    - mahout 
+    - oozie 
+    - pig 
+    - pig-udf-datafu 
+    - search 
+    - sentry 
+    - solr-mapreduce 
+    - spark-python 
+    - sqoop 
+    - sqoop2
+    - whirr
+  - name: db start
+    shell: service cloudera-scm-server-db start
+  - name: Clouder aget start
+    shell: service cloudera-scm-agent start
+  - name: Clouder server start
+    shell: service cloudera-scm-server start 
+
+  vars:
+    hadoop_ner_1: "hadoop-ner-1"
+    hadoop_ner_ip_1: "192.168.2.85"
+    hadoop_ner_2: "hadoop-ner-2"
+    hadoop_ner_ip_2: "192.168.2.86"
+    hadoop_ner_3: "hadoop-ner-3"
+    hadoop_ner_ip_3: "192.168.2.87"
+    hadoop_ner_4: "hadoop-ner-4"
+    hadoop_ner_ip_4: "192.168.2.88"
+    disable_ipv6_1: "net.ipv6.conf.all.disable_ipv6 = 1"
+    disable_ipv6_2: "net.ipv6.conf.default.disable_ipv6 = 1"
+    disable_ipv6_3: "net.ipv6.conf.lo.disable_ipv6 = 1"
+
