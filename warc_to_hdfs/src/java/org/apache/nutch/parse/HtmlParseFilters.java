@@ -19,24 +19,27 @@ package org.apache.nutch.parse;
 
 import java.util.HashMap;
 
-import org.apache.nutch.protocol.Content;
-import org.apache.nutch.plugin.*;
-import org.apache.nutch.util.ObjectCache;
 import org.apache.hadoop.conf.Configuration;
-
+import org.apache.nutch.plugin.Extension;
+import org.apache.nutch.plugin.ExtensionPoint;
+import org.apache.nutch.plugin.PluginRepository;
+import org.apache.nutch.plugin.PluginRuntimeException;
+import org.apache.nutch.protocol.Content;
+import org.apache.nutch.util.ObjectCache;
 import org.w3c.dom.DocumentFragment;
 
-/** Creates and caches {@link HtmlParseFilter} implementing plugins.*/
+/** Creates and caches {@link HtmlParseFilter} implementing plugins. */
 public class HtmlParseFilters {
 
-  private HtmlParseFilter[] htmlParseFilters;
+    private HtmlParseFilter[] htmlParseFilters;
 
-  public HtmlParseFilters(Configuration conf) {
+    public HtmlParseFilters(Configuration conf) {
         ObjectCache objectCache = ObjectCache.get(conf);
         this.htmlParseFilters = (HtmlParseFilter[]) objectCache.getObject(HtmlParseFilter.class.getName());
+
         if (htmlParseFilters == null) {
-            HashMap<String, HtmlParseFilter> filters =
-              new HashMap<String, HtmlParseFilter>();
+            HashMap<String, HtmlParseFilter> filters = new HashMap<String, HtmlParseFilter>();
+
             try {
                 ExtensionPoint point = PluginRepository.get(conf).getExtensionPoint(HtmlParseFilter.X_POINT_ID);
                 if (point == null)
@@ -54,30 +57,30 @@ public class HtmlParseFilters {
             } catch (PluginRuntimeException e) {
                 throw new RuntimeException(e);
             }
+
             this.htmlParseFilters = (HtmlParseFilter[]) objectCache.getObject(HtmlParseFilter.class.getName());
         }
-    }                  
-
-  /** Run all defined filters. */
-  public ParseResult filter(Content content, ParseResult parseResult, HTMLMetaTags metaTags, DocumentFragment doc) {
-
-    // loop on each filter
-    for (int i = 0 ; i < this.htmlParseFilters.length; i++) {
-      // call filter interface
-      parseResult =
-        htmlParseFilters[i].filter(content, parseResult, metaTags, doc);
-
-      // any failure on parse obj, return
-      if (!parseResult.isSuccess()) {
-        // TODO: What happens when parseResult.isEmpty() ?
-        // Maybe clone parseResult and use parseResult as backup...
-
-        // remove failed parse before return
-        parseResult.filter();
-        return parseResult;
-      }
     }
 
-    return parseResult;
-  }
+    /** Run all defined filters. */
+    public ParseResult filter(Content content, ParseResult parseResult, HTMLMetaTags metaTags, DocumentFragment doc) {
+
+        // loop on each filter
+        for (int i = 0; i < this.htmlParseFilters.length; i++) {
+            // call filter interface
+            parseResult = htmlParseFilters[i].filter(content, parseResult, metaTags, doc);
+
+            // any failure on parse obj, return
+            if (!parseResult.isSuccess()) {
+                // TODO: What happens when parseResult.isEmpty() ?
+                // Maybe clone parseResult and use parseResult as backup...
+
+                // remove failed parse before return
+                parseResult.filter();
+                return parseResult;
+            }
+        }
+
+        return parseResult;
+    }
 }
