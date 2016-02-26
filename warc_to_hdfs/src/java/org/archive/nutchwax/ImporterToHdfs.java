@@ -16,6 +16,9 @@
  */
 package org.archive.nutchwax;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
@@ -23,6 +26,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Scanner;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -254,7 +258,7 @@ public class ImporterToHdfs extends Configured implements Tool,
             }
         } finally {
             r.close();
-
+            add2ProcessedFile(arcUrl);
             if (LOG.isInfoEnabled()) {
                 LOG.info("Completed ARC: " + arcUrl);
             }
@@ -712,7 +716,6 @@ public class ImporterToHdfs extends Configured implements Tool,
             }
 
             job.set("nutchwax.urlfilter.wayback.exclusions", args[1]);
-
             pos = 2;
         }
 
@@ -722,7 +725,21 @@ public class ImporterToHdfs extends Configured implements Tool,
             return -1;
         }
 
-        Path manifestPath = new Path(args[pos++]);
+        Path manifestPath;
+
+        // Check for "-p <path_to_warc_files>" option.
+        if (args[0].equals("-p")) {
+            if (args.length < 2) {
+                System.out.println("ERROR: Missing path for option \"-p\"\n");
+                usage();
+                return -1;
+            }
+            pos = 2;
+
+            manifestPath = new Path(getManifestFile(args[1]));
+        } else {
+            manifestPath = new Path(args[pos++]);
+        }
 
         Path segmentPath;
         if (args.length - pos < 1) {
@@ -755,6 +772,106 @@ public class ImporterToHdfs extends Configured implements Tool,
             System.out.println("Fatal error: " + e);
             e.printStackTrace(System.out);
             return -1;
+        }
+    }
+
+    private String getManifestFile(String path) throws IOException {
+        File processedFiles = getProcessedFile(path);
+        File manifestFile = getManifestFileLocation(path);
+        ArrayList<File> files = getFiles(path, processedFiles);
+
+        BufferedWriter output = null;
+        try {
+            output = new BufferedWriter(new FileWriter(manifestFile));
+            for (File f : files) {
+                output.write(f.getAbsolutePath());
+                output.write("\n");
+            }
+        } catch (Exception e) {
+            System.out.println("Fatal error: " + e);
+            e.printStackTrace(System.out);
+        } finally {
+            if (output != null) {
+                output.close();
+            }
+        }
+
+        return manifestFile.getAbsolutePath();
+    }
+
+    private ArrayList<File> getFiles(String dirPath, File processedFiles) {
+        File path = new File(dirPath);
+        ArrayList<File> list = new ArrayList<File>();
+        for (File file : path.listFiles()) {
+            if (file.getName().endsWith(".warc") && !isFileProcessed(file.getAbsolutePath(), processedFiles)) {
+                list.add(file);
+            }
+        }
+
+        return list;
+    }
+
+    private boolean isFileProcessed(String filename, File processedFiles) {
+        try {
+            Scanner scanner = new Scanner(processedFiles);
+            while(scanner.hasNextLine()){
+                String line = scanner.nextLine();
+                if (line.equals(filename)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Fatal error: " + e);
+            e.printStackTrace(System.out);
+        }
+        return false;
+    }
+
+    private File getManifestFileLocation(String path) {
+        if (!path.endsWith("/")) {
+            path = path + "/";
+        }
+        path = path + "manifest.txt";
+
+        return new File(path);
+    }
+
+    private File getProcessedFile(String path) {
+        if (!path.endsWith("/")) {
+            path = path + "/";
+        }
+        path = path + ".processed";
+        File processed = new File(path);
+        if (!processed.exists()) {
+            try {
+                processed.createNewFile();
+            } catch (IOException e) {
+                System.out.println("Fatal error: " + e);
+                e.printStackTrace(System.out);
+            }
+        }
+        return processed;
+    }
+
+    private void add2ProcessedFile(String warcFile) {
+        File path = getProcessedFile(warcFile.substring(0, warcFile.lastIndexOf("/")));
+        BufferedWriter output = null;
+        try {
+            output = new BufferedWriter(new FileWriter(path, true));
+            output.write(warcFile);
+            output.write("\n");
+        } catch (IOException e) {
+            System.out.println("Fatal error: " + e);
+            e.printStackTrace(System.out);
+        } finally {
+            if (output != null) {
+                try {
+                    output.close();
+                } catch (IOException e) {
+                    System.out.println("Fatal error: " + e);
+                    e.printStackTrace(System.out);
+                }
+            }
         }
     }
 
