@@ -23,6 +23,9 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -778,13 +781,13 @@ public class ImporterToHdfs extends Configured implements Tool,
     private String getManifestFile(String path) throws IOException {
         File processedFiles = getProcessedFile(path);
         File manifestFile = getManifestFileLocation(path);
-        ArrayList<File> files = getFiles(path, processedFiles);
+        List<String> files = getFiles(path, processedFiles);
 
         BufferedWriter output = null;
         try {
             output = new BufferedWriter(new FileWriter(manifestFile));
-            for (File f : files) {
-                output.write(f.getAbsolutePath());
+            for (String f : files) {
+                output.write(f);
                 output.write("\n");
             }
         } catch (Exception e) {
@@ -799,11 +802,12 @@ public class ImporterToHdfs extends Configured implements Tool,
         return manifestFile.getAbsolutePath();
     }
 
-    private ArrayList<File> getFiles(String dirPath, File processedFiles) {
-        File path = new File(dirPath);
-        ArrayList<File> list = new ArrayList<File>();
-        for (File file : path.listFiles()) {
-            if (file.getName().endsWith(".warc") && !isFileProcessed(file.getAbsolutePath(), processedFiles)) {
+    private List<String> getFiles(String dirPath, File processedFiles) {
+        List<String> processed = getProcessedFiles(processedFiles.getAbsolutePath());
+        List<String> list = new ArrayList<String>();
+
+        for (String file : getFilesList(dirPath)) {
+            if (file.endsWith(".warc") && !processed.contains(file)) {
                 list.add(file);
             }
         }
@@ -811,20 +815,29 @@ public class ImporterToHdfs extends Configured implements Tool,
         return list;
     }
 
-    private boolean isFileProcessed(String filename, File processedFiles) {
+    private List<String> getFilesList(String dirPath) {
+        File path = new File(dirPath);
+        List<String> listFiles = new ArrayList<String>();
+
+        for (File file : path.listFiles()) {
+            listFiles.add(file.getAbsolutePath());
+        }
+
+        return listFiles;
+    }
+
+    private List<String> getProcessedFiles(String path) {
+        List<String> processed = new ArrayList<String>();
+
         try {
-            Scanner scanner = new Scanner(processedFiles);
-            while(scanner.hasNextLine()){
-                String line = scanner.nextLine();
-                if (line.equals(filename)) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
+            java.nio.file.Path file = Paths.get(path);
+            processed = Files.readAllLines(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
             System.out.println("Fatal error: " + e);
             e.printStackTrace(System.out);
         }
-        return false;
+
+        return processed;
     }
 
     private File getManifestFileLocation(String path) {
@@ -840,8 +853,10 @@ public class ImporterToHdfs extends Configured implements Tool,
         if (!path.endsWith("/")) {
             path = path + "/";
         }
+
         path = path + ".processed";
         File processed = new File(path);
+
         if (!processed.exists()) {
             try {
                 processed.createNewFile();
@@ -850,6 +865,7 @@ public class ImporterToHdfs extends Configured implements Tool,
                 e.printStackTrace(System.out);
             }
         }
+
         return processed;
     }
 
