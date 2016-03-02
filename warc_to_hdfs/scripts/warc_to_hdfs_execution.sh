@@ -11,6 +11,9 @@ then
                 -f=*|--file=*)
                 file="${n#*=}"
                 ;;
+                -l=*|--log=*)
+                logfile="${n#*=}"
+                ;;
         esac
         done
 
@@ -28,7 +31,14 @@ then
                exit
         fi
 
-        answer=`/bin/sh $file import_to_hdfs -p $path`
+        if [ ! -f "$logfile" ];
+        then 
+               echo "Log file '$logfile' not found."
+               echo "Exiting"
+               exit
+        fi
+
+        answer=`/bin/sh $file import_to_hdfs -p $path | tee -a $logfile`
         echo "$answer"
         if [ -z "$answer" -a "$answer" != " " ];
         then
