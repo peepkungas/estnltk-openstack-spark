@@ -39,7 +39,6 @@ then
         fi
 
         answer=`/bin/sh $file import_to_hdfs -p $path | tee -a $logfile`
-        echo "$answer"
         if [ -z "$answer" -a "$answer" != " " ];
         then
                 echo "All files for path '$path' already successfully processed. Exiting."
