@@ -42,11 +42,11 @@ then
         echo "$answer"
         if [ -z "$answer" -a "$answer" != " " ];
         then
-                echo "All files already successfully processed. Exiting."
+                echo "All files for path '$path' already successfully processed. Exiting."
                 exit
         fi
 
-        echo "Successfully finished"
+        echo "Successfully finished for path '$path'"
 else
         echo "import_to_hdfs is running. Exiting"
 fi
