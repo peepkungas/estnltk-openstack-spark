@@ -16,12 +16,17 @@
  */
 package org.archive.nutchwax;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -29,7 +34,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Scanner;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,6 +41,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.Writer;
 import org.apache.hadoop.io.Text;
@@ -115,8 +120,8 @@ public class ImporterToHdfs extends Configured implements Tool,
 
     private String seqFilePrefix;
     private String seqFileSuffix;
-
     private String seqFilePath;
+    private String seqFilePathLocal;
 
     /**
      * ?: Is this necessary?
@@ -160,6 +165,7 @@ public class ImporterToHdfs extends Configured implements Tool,
         this.seqFilePrefix = jobConf.get("nutchwax.importer.hdfs.seqfileprefix");
         this.seqFileSuffix = jobConf.get("nutchwax.importer.hdfs.seqfilesuffix");
         this.seqFilePath = jobConf.get("nutchwax.importer.hdfs.seqfilepath");
+        this.seqFilePathLocal = jobConf.get("nutchwax.importer.hdfs.seqfilepath.local");
     }
 
     /**
@@ -189,6 +195,7 @@ public class ImporterToHdfs extends Configured implements Tool,
      */
     public void map(final WritableComparable key, final Writable value, final OutputCollector output,
             final Reporter reporter) throws IOException {
+        boolean success = false;
         String arcUrl = "";
         String collection = "";
         String segmentName = getConf().get(Nutch.SEGMENT_NAME_KEY);
@@ -225,11 +232,27 @@ public class ImporterToHdfs extends Configured implements Tool,
             // XXX : Rewritten to accomodate HDFS sequencefile writing
             String prefix = seqFilePrefix;
             String suffix = seqFileSuffix;
-            String outfilepath = seqFilePath;
+            String outfilepath = seqFilePathLocal;
+            String hdfsfilepath = seqFilePath;
             String arcfilename = prefix + arcUrl.substring(arcUrl.lastIndexOf("/") + 1) + suffix;
             Path path = new Path(outfilepath + "/" + arcfilename);
-            Writer writer = SequenceFile.createWriter(fs, conf, path, new Text().getClass(), new Text().getClass());
 
+            if (hdfsfilepath != null && hdfsfilepath.startsWith("hdfs://")) {
+                try {
+                    fs = FileSystem.get(new URI(hdfsfilepath), conf); 
+                    path = new Path(hdfsfilepath + "/" + arcfilename);
+                    if (fs.exists(path)) {
+                        fs.delete(path, true);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Writing to hdfs failed: " + e.getMessage());
+                    // Lets's write to local
+                    fs = FileSystem.get(conf);
+                    path = new Path(outfilepath + "/" + arcfilename);
+                }
+            }
+
+            Writer writer = SequenceFile.createWriter(fs, conf, path, new Text().getClass(), new Text().getClass());
             for (ARCRecord record : reader) {
                 // When reading WARC files, records of type other than
                 // "response" are returned as 'null' by the Iterator, so
@@ -239,7 +262,6 @@ public class ImporterToHdfs extends Configured implements Tool,
                 }
 
                 importRecord(record, segmentName, collection, output, writer);
-
                 reporter.progress();
             }
             writer.close();
@@ -253,18 +275,24 @@ public class ImporterToHdfs extends Configured implements Tool,
              * "\t len: " + val_r.getLength()); }
              */
 
+            success = true;
         } catch (Exception e) {
             LOG.warn("Error processing archive file: " + arcUrl, e);
+            System.out.println("Error processing archive file: " + arcUrl + ", " + e);
 
             if (jobConf.getBoolean("nutchwax.import.abortOnArchiveReadError", false)) {
                 throw new IOException(e);
             }
         } finally {
             r.close();
-            add2ProcessedFile(arcUrl);
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Completed ARC: " + arcUrl);
+            if (success) {
+                add2ProcessedFile(arcUrl);
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Completed ARC: " + arcUrl);
+                    System.out.println("Completed ARC: " + arcUrl);
+                }
             }
+
         }
 
     }

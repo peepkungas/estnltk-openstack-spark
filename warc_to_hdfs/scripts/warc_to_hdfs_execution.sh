@@ -17,29 +17,25 @@ then
         esac
         done
 
-        if [ ! -d "$path" ];
-        then 
+        if [ ! -d "$path" ]; then 
                 echo "Warc files path '$path' not found."
                 echo "Exiting"
                 exit
         fi
 
-        if [ ! -f "$file" ];
-        then 
+        if [ ! -f "$file" ]; then 
                 echo "nutchwax execution file '$file' not found."
                 echo "Exiting"
                 exit
         fi
 
-        if [[ -n "$logfile" ]];
-        then 
+        if [[ -n "$logfile" ]]; then 
                 answer=`/bin/sh $file import_to_hdfs -p $path | tee -a $logfile`
         else
                 answer=`/bin/sh $file import_to_hdfs -p $path`
         fi
 
-        if [ -z "$answer" -a "$answer" != " " ];
-        then
+        if [ -z "$answer" -a "$answer" != " " ]; then
                 echo "All files for path '$path' already successfully processed. Exiting."
                 exit
         fi

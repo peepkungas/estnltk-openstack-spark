@@ -31,12 +31,12 @@ Let's have three WARC files located in "/home/kaarelt/warcfiles". We want to cre
 This will output one sequencefile for each WARC input file into "/home/kaarelt/seqfiles".
 
 
-For automatic start use cron to call warc to hdfs shell script (scripts/warc_to_hdfs_execution.sh)
+For automatic start (manifest.txt file is created automatically) use cron to call warc to hdfs shell script (scripts/warc_to_hdfs_execution.sh)
     -f=<nutchwax_location>
     -p=<warc_files_location>
     -l=<log_file_localtion>
 
 Example:
 $ crontab -l
-$ 0 * * * * /bin/sh /home/kaarelt/warc_to_hdfs/scripts/warc_to_hdfs_execution.sh -f=/opt/estnltk-openstack-spark/warc_to_hdfs/bin/nutchwax -p=/home/kaarelt/warcfiles -l=/home/kaarelt/logs/warc_to_hdfs.log
+$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/warc_to_hdfs/scripts/warc_to_hdfs_execution.sh -f=/home/kaarelt/estnltk-openstack-spark/warc_to_hdfs/bin/nutchwax -p=/home/kaarelt/warcfiles -l=/home/kaarelt/logs/warc_to_hdfs.log
 

@@ -206,9 +206,15 @@
 </property>
 
 <property>
-  <name>nutchwax.importer.hdfs.seqfilepath</name>
+  <name>nutchwax.importer.hdfs.seqfilepath.local</name>
   <value>./sequencefiles</value>
   <description>Path to location where ImporterToHdfs outputs the sequencefiles.</description>
+</property>
+
+<property>
+  <name>nutchwax.importer.hdfs.seqfilepath</name>
+  <value>hdfs://hadoop-ner-1:8020</value>
+  <description>Path to hdfs location where ImporterToHdfs outputs the sequencefiles.</description>
 </property>
 
 </configuration>
