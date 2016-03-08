@@ -19,26 +19,25 @@ then
 
         if [ ! -d "$path" ];
         then 
-               echo "Warc files path '$path' not found."
-               echo "Exiting"
-               exit
+                echo "Warc files path '$path' not found."
+                echo "Exiting"
+                exit
         fi
 
         if [ ! -f "$file" ];
         then 
-               echo "nutchwax execution file '$file' not found."
-               echo "Exiting"
-               exit
+                echo "nutchwax execution file '$file' not found."
+                echo "Exiting"
+                exit
         fi
 
-        if [ ! -f "$logfile" ];
+        if [[ -n "$logfile" ]];
         then 
-               echo "Log file '$logfile' not found."
-               echo "Exiting"
-               exit
+                answer=`/bin/sh $file import_to_hdfs -p $path | tee -a $logfile`
+        else
+                answer=`/bin/sh $file import_to_hdfs -p $path`
         fi
 
-        answer=`/bin/sh $file import_to_hdfs -p $path | tee -a $logfile`
         if [ -z "$answer" -a "$answer" != " " ];
         then
                 echo "All files for path '$path' already successfully processed. Exiting."
