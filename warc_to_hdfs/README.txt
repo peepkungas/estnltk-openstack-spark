@@ -15,7 +15,9 @@ SequenceFiles are in a compressed format and therefore are not human-readable.
 Relevant conf/nutch-site.xml configuration parameters. Edit them accoridng to your needs:
     nutchwax.importer.hdfs.seqfileprefix : Prefix string to be added to output files
     nutchwax.importer.hdfs.seqfilesuffix : Suffix string to be added to output files
-    nutchwax.importer.hdfs.seqfilepath : Output directory (location of created sequencefiles) 
+    nutchwax.importer.hdfs.seqfilepath : Output directory (location of created sequencefiles). For hdfs use full path hdfs://<hdfs_server>:<port>/<location_of_created_sequencefiles>
+    nutchwax.importer.hdfs.manifestPath : Output directory for manifest.txt file (warc files to be processed)
+    nutchwax.importer.hdfs.processedPath : Output directory for .processed file (all processed warc files will be added)
 
 Example:
 Let's have three WARC files located in "/home/kaarelt/warcfiles". We want to create sequencefiles from them and output them into "/home/kaarelt/seqfiles".
@@ -34,7 +36,7 @@ This will output one sequencefile for each WARC input file into "/home/kaarelt/s
 For automatic start (manifest.txt file is created automatically) use cron to call warc to hdfs shell script (scripts/warc_to_hdfs_execution.sh)
     -f=<nutchwax_location>
     -p=<warc_files_location>
-    -l=<log_file_localtion>
+    -l=<script_output_log_file_localtion>
 
 Example:
 $ crontab -l

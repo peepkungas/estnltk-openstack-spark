@@ -205,16 +205,27 @@
   <description>Suffix to be added to sequencefiles created by ImporterToHdfs.</description>
 </property>
 
+<!-- Hdfs works with hadoop version 0.9.2. All newer versions are out of scoop 
+  To use directly adding to HDFS server hadoop version has to be also 0.9.2
+  If server version is newer, hadoop client will not work and proper exception will be thrown.
+  For using with hdfs define value "hdfs://<hadoop_server>:<port>"
+-->
 <property>
-  <name>nutchwax.importer.hdfs.seqfilepath.local</name>
+  <name>nutchwax.importer.hdfs.seqfilepath</name>
   <value>./sequencefiles</value>
   <description>Path to location where ImporterToHdfs outputs the sequencefiles.</description>
 </property>
 
 <property>
-  <name>nutchwax.importer.hdfs.seqfilepath</name>
-  <value>hdfs://hadoop-ner-1:8020</value>
-  <description>Path to hdfs location where ImporterToHdfs outputs the sequencefiles.</description>
+  <name>nutchwax.importer.hdfs.manifestPath</name>
+  <value>./</value>
+  <description>Path to location where ImporterToHdfs outputs the manifest.txt file.</description>
+</property>
+
+<property>
+  <name>nutchwax.importer.hdfs.processedPath</name>
+  <value>./</value>
+  <description>Path to location where ImporterToHdfs outputs the .processed file.</description>
 </property>
 
 </configuration>

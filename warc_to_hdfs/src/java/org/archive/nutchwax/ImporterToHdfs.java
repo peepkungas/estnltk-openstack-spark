@@ -16,17 +16,14 @@
  */
 package org.archive.nutchwax;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -41,7 +38,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.Writer;
 import org.apache.hadoop.io.Text;
@@ -120,8 +116,7 @@ public class ImporterToHdfs extends Configured implements Tool,
 
     private String seqFilePrefix;
     private String seqFileSuffix;
-    private String seqFilePath;
-    private String seqFilePathLocal;
+    private String seqFilePath; 
 
     /**
      * ?: Is this necessary?
@@ -165,7 +160,6 @@ public class ImporterToHdfs extends Configured implements Tool,
         this.seqFilePrefix = jobConf.get("nutchwax.importer.hdfs.seqfileprefix");
         this.seqFileSuffix = jobConf.get("nutchwax.importer.hdfs.seqfilesuffix");
         this.seqFilePath = jobConf.get("nutchwax.importer.hdfs.seqfilepath");
-        this.seqFilePathLocal = jobConf.get("nutchwax.importer.hdfs.seqfilepath.local");
     }
 
     /**
@@ -226,30 +220,19 @@ public class ImporterToHdfs extends Configured implements Tool,
         ArcReader reader = new ArcReader(r);
 
         try {
-            Configuration conf = new Configuration();
-            FileSystem fs = FileSystem.get(conf);
-
             // XXX : Rewritten to accomodate HDFS sequencefile writing
             String prefix = seqFilePrefix;
             String suffix = seqFileSuffix;
-            String outfilepath = seqFilePathLocal;
-            String hdfsfilepath = seqFilePath;
+            String outfilepath = seqFilePath;
+
+            Configuration conf = getConfiguration();
+            FileSystem fs = getFileSystem(outfilepath, conf);
+
             String arcfilename = prefix + arcUrl.substring(arcUrl.lastIndexOf("/") + 1) + suffix;
             Path path = new Path(outfilepath + "/" + arcfilename);
 
-            if (hdfsfilepath != null && hdfsfilepath.startsWith("hdfs://")) {
-                try {
-                    fs = FileSystem.get(new URI(hdfsfilepath), conf); 
-                    path = new Path(hdfsfilepath + "/" + arcfilename);
-                    if (fs.exists(path)) {
-                        fs.delete(path, true);
-                    }
-                } catch (Exception e) {
-                    System.out.println("Writing to hdfs failed: " + e.getMessage());
-                    // Lets's write to local
-                    fs = FileSystem.get(conf);
-                    path = new Path(outfilepath + "/" + arcfilename);
-                }
+            if (fs.exists(path)) {
+                fs.delete(path, true);
             }
 
             Writer writer = SequenceFile.createWriter(fs, conf, path, new Text().getClass(), new Text().getClass());
@@ -278,23 +261,44 @@ public class ImporterToHdfs extends Configured implements Tool,
             success = true;
         } catch (Exception e) {
             LOG.warn("Error processing archive file: " + arcUrl, e);
-            System.out.println("Error processing archive file: " + arcUrl + ", " + e);
 
             if (jobConf.getBoolean("nutchwax.import.abortOnArchiveReadError", false)) {
                 throw new IOException(e);
             }
         } finally {
             r.close();
-            if (success) {
+            if (success && System.getProperty("fullPathExecution").equals("true")) {
                 add2ProcessedFile(arcUrl);
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Completed ARC: " + arcUrl);
-                    System.out.println("Completed ARC: " + arcUrl);
                 }
             }
 
         }
 
+    }
+
+    private static Configuration getConfiguration() {
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+        return conf;
+    }
+
+    private FileSystem getFileSystem(String outfilepath, Configuration conf) {
+        try {
+            if (outfilepath.startsWith("hdfs://")) {
+                return FileSystem.get(new URI(outfilepath), conf);
+            } else {
+                return FileSystem.get(conf);
+            }
+        } catch (IOException e) {
+            LOG.error(e.getMessage());
+            throw new RuntimeException(e);
+        } catch (URISyntaxException e) {
+            LOG.error(e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -766,9 +770,10 @@ public class ImporterToHdfs extends Configured implements Tool,
                 return -1;
             }
             pos = 2;
-
+            System.setProperty("fullPathExecution", "true");
             manifestPath = new Path(getManifestFile(args[1]));
         } else {
+            System.setProperty("fullPathExecution", "false");
             manifestPath = new Path(args[pos++]);
         }
 
@@ -869,6 +874,10 @@ public class ImporterToHdfs extends Configured implements Tool,
     }
 
     private File getManifestFileLocation(String path) {
+        if (getManifestPath()!= null && !getManifestPath().isEmpty()) {
+            path = getManifestPath();
+        }
+
         if (!path.endsWith("/")) {
             path = path + "/";
         }
@@ -878,6 +887,10 @@ public class ImporterToHdfs extends Configured implements Tool,
     }
 
     private File getProcessedFile(String path) {
+        if (getProcessedPath() != null && !getProcessedPath().isEmpty()) {
+            path = getProcessedPath();
+        }
+
         if (!path.endsWith("/")) {
             path = path + "/";
         }
@@ -919,11 +932,24 @@ public class ImporterToHdfs extends Configured implements Tool,
         }
     }
 
+    private String getManifestPath() {
+        return getConf().get("nutchwax.importer.hdfs.manifestPath");
+    }
+
+    private String getProcessedPath() {
+        return getConf().get("nutchwax.importer.hdfs.processedPath");
+    }
+
     /**
      * Emit usage information for command-line driver.
      */
     public void usage() {
-        String usage = "Usage: import_to_hdfs [opts] <manifest> [<segment>]\n" + "Options:\n"
+        String usage = "Usage: import_to_hdfs [opts] [<manifest>] [<segment>]\n" + "Options:\n"
+                + "  -p path         warc files location, generates manifest file automatically.\n"
+                + "Created manifest file location is specified in configuration.\n"
+                + "Manifest file will be genereted in <path> directory if configuration missing manifest file specification.\n"
+                + "Argument <manifest> will be ignored if path is specified.\n"
+                + "If <path> not added, argument <manifest> has to be specified.\n" + "\n"
                 + "  -e filename     Exclusions file, over-rides configuration property.\n" + "\n"
                 + "If <segment> not specified, a pathname will be automatically generated\n"
                 + "based on current time in sub-directory 'segments', which is created if\n"
