@@ -740,41 +740,35 @@ public class ImporterToHdfs extends Configured implements Tool,
         }
 
         JobConf job = new NutchJob(getConf());
+        System.setProperty("fullPathExecution", "false");
+        Path manifestPath = null;
 
-        // Check for "-e <exclusions>" option.
+        // Check for "-e <exclusions>" option & "-p <path_to_warc_files>" option.
         int pos = 0;
-        if (args[0].equals("-e")) {
-            if (args.length < 2) {
-                System.out.println("ERROR: Missing filename for option \"-e\"\n");
+        for (String[] str : getOptsList(args)) {
+            if (args.length < pos + 2) {
+                System.out.println("ERROR: Missing filename for option \"" + str[0] + "\"\n");
                 usage();
                 return -1;
             }
 
-            job.set("nutchwax.urlfilter.wayback.exclusions", args[1]);
-            pos = 2;
+            if (str[0].equals("-p")) {
+                manifestPath = new Path(getManifestFile(str[1]));
+                System.setProperty("fullPathExecution", "true");
+            } else if (str[0].equals("-e")) {
+                job.set("nutchwax.urlfilter.wayback.exclusions", str[1]);
+            }
+            pos = pos + 2;
         }
 
-        if (args.length - pos < 1) {
-            System.out.println("ERROR: Missing manifest file.\n");
-            usage();
-            return -1;
-        }
-
-        Path manifestPath;
-
-        // Check for "-p <path_to_warc_files>" option.
-        if (args[0].equals("-p")) {
-            if (args.length < 2) {
-                System.out.println("ERROR: Missing path for option \"-p\"\n");
+        if (manifestPath == null) {
+            if (args.length - pos < 1) {
+                System.out.println("ERROR: Missing manifest file.\n");
                 usage();
                 return -1;
+            } else {
+                manifestPath = new Path(args[pos++]);
             }
-            pos = 2;
-            System.setProperty("fullPathExecution", "true");
-            manifestPath = new Path(getManifestFile(args[1]));
-        } else {
-            System.setProperty("fullPathExecution", "false");
-            manifestPath = new Path(args[pos++]);
         }
 
         Path segmentPath;
@@ -809,6 +803,21 @@ public class ImporterToHdfs extends Configured implements Tool,
             e.printStackTrace(System.out);
             return -1;
         }
+    }
+
+    private List<String[]> getOptsList(String[] args) {
+        List<String[]> list = new ArrayList<String[]>();
+        if (hasArgument(args[0])) {
+            list.add(new String[] { args[0], args.length >= 2 ? args[1] : "" });
+        }
+        if (args.length >= 3 && hasArgument(args[2])) {
+            list.add(new String[] { args[2], args.length >= 4 ? args[3] : ""});
+        }
+        return list;
+    }
+
+    private boolean hasArgument(String val) {
+        return val.equals("-p") || val.equals("-e");
     }
 
     private String getManifestFile(String path) throws IOException {
@@ -944,11 +953,11 @@ public class ImporterToHdfs extends Configured implements Tool,
      * Emit usage information for command-line driver.
      */
     public void usage() {
-        String usage = "Usage: import_to_hdfs [opts] [<manifest>] [<segment>]\n" + "Options:\n"
-                + "  -p path         warc files location, generates manifest file automatically.\n"
+        String usage = "Usage: import_to_hdfs [opts] [<manifest>] [<segment>]\n" + "Options:\n\n"
+                + "  -p path         warc files location, generates manifest file automatically.\n\n"
                 + "Created manifest file location is specified in configuration.\n"
                 + "Manifest file will be genereted in <path> directory if configuration missing manifest file specification.\n"
-                + "Argument <manifest> will be ignored if path is specified.\n"
+                + "Argument <manifest> can't be used if <path> is specified.\n"
                 + "If <path> not added, argument <manifest> has to be specified.\n" + "\n"
                 + "  -e filename     Exclusions file, over-rides configuration property.\n" + "\n"
                 + "If <segment> not specified, a pathname will be automatically generated\n"
