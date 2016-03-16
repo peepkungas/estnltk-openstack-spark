@@ -185,8 +185,6 @@
   <value>false</value>
 </property>
 
-
-
 <property>
   <name>nutchwax.urlfilter.regex.exclusions</name>
   <value>conf/textonly-urlfilter.txt</value>
@@ -197,7 +195,7 @@
   <name>nutchwax.importer.hdfs.seqfileprefix</name>
   <value>publicweb_</value>
   <description>Prefix to be added to sequencefiles created by ImporterToHdfs.</description>
-</property>  
+</property>
 
 <property>
   <name>nutchwax.importer.hdfs.seqfilesuffix</name>
@@ -208,7 +206,7 @@
 <!-- Hdfs works with hadoop version 0.9.2. All newer versions are out of scoop 
   To use directly adding to HDFS server hadoop version has to be also 0.9.2
   If server version is newer, hadoop client will not work and proper exception will be thrown.
-  For using with hdfs define value "hdfs://<hadoop_server>:<port>"
+  For using with hdfs define value "hdfs://<hadoop_server>:<port>/<dir_path>"
 -->
 <property>
   <name>nutchwax.importer.hdfs.seqfilepath</name>
