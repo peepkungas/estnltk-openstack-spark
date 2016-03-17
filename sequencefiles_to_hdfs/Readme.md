@@ -11,15 +11,18 @@ Usage:
     
     java -jar <generated_jar_file> <sequence_files_inputpath> <sequence_files_outputpath>
     <sequence_files_outputpath> can be local file system or hdfs (for hdfs use: hdfs://<hadoop_server>:<port>/<output_path> 
+
     example: java -jar /home/kaarelt/sequencefiles-to-hdfs-0.0.1-SNAPSHOT.jar /home/kaarelt/sequencefiles/ hdfs://hadoop-ner-1:8020/sequencefiles
 
 For automatic start use cron to call sqeuencefiles_to_hdfs shell script (scripts/move_sequencefiles_files_to_hdfs.sh)
+
     -f=<jar_file_location>
     -p=<log_file_properties>
     -i=<sequence_files_inputpath>
     -o=<sequence_files_outputpath>
 
 Example:
-$ crontab -l
-$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/sequencefiles_to_hdfs/scripts//move_sequencefiles_files_to_hdfs.sh -f=/home/kaarelt/sequencefiles-to-hdfs-0.0.1-SNAPSHOT.jar -p= /home/kaarelt/estnltk-openstack-spark/sequencefiles_to_hdfs/src/main/resources/log4j.properties -i=/home/kaarelt/sequencefiles -o=hdfs://hadoop-ner-1:8020/sequencefiles
+
+    $crontab -l
+    $ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/sequencefiles_to_hdfs/scripts//move_sequencefiles_files_to_hdfs.sh -f=/home/kaarelt/sequencefiles-to-hdfs-0.0.1 SNAPSHOT.jar -p= /home/kaarelt/estnltk-openstack-spark/sequencefiles_to_hdfs/src/main/resources/log4j.properties -i=/home/kaarelt/sequencefiles -o=hdfs://hadoop-ner-1:8020/sequencefiles
 
