@@ -22,7 +22,7 @@ then
         if [ ! -f "$file" ]; then 
                 echo "Execution file '$file' not found."
                 echo "Usage: <jar_file_location> <log_properties> <inputpath> <outputpath>"
-                echo "Exiting"
+                echo "Exiting..."
                 exit
         fi
 
@@ -36,21 +36,21 @@ then
         if [ ! -d "$inputpath" ]; then 
                 echo "Input path '$inputpath' not found."
                 echo "Usage: <jar_file_location> <log_properties> <inputpath> <outputpath>"
-                echo "Exiting"
+                echo "Exiting..."
                 exit
         fi
 
         if [ ! -f "$file" ];
         then 
                 echo "File $file does not exist."
-                echo "Exiting"
+                echo "Exiting..."
                 exit
         fi
 
         if [ ! -f "$properties" ];
         then 
                 echo "Properties file $properties does not exist."
-                echo "Exiting"
+                echo "Exiting..."
                 exit
         fi
 
@@ -60,8 +60,8 @@ then
                 exit
         fi
 
-        echo "Copy of sequence files to HDFS has finished."
+        echo "Sequence files copying to HDFS has finished. Done..."
 
 else
-        echo "Copy of sequence files to HDFS is already running. Exiting"
+        echo "Sequence files copying to HDFS is already running. Exiting..."
 fi
