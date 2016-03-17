@@ -1,13 +1,11 @@
 #!/bin/bash
 #if script work is not in progress
-if [ $(ps aux | grep 'sequencefiles-to-hdf' | grep -v 'grep' | wc -l) -eq 2 ];
+export HADOOP_HOME="/opt/cloudera/parcels/CDH-5.5.1-1.cdh5.5.1.p0.11/lib/hadoop/"
+if [ $(ps aux | grep 'sequencefiles-to-hdfs-0.0.1-SNAPSHOT.jar' | grep -v 'grep' | wc -l) -eq 0 ];
 then
         for n in "$@"
         do
         case $n in
-                -f=*|--file=*)
-                file="${n#*=}"
-                ;;
                 -p=*|--properties=*)
                 properties="${n#*=}"
                 ;;
@@ -20,6 +18,7 @@ then
         esac
         done
 
+        file=/opt/estnltk-openstack-spark/sequencefiles_to_hdfs/target/sequencefiles-to-hdfs-0.0.1-SNAPSHOT.jar
         if [ ! -f "$file" ]; then 
                 echo "Execution file '$file' not found."
                 echo "Usage: <jar_file_location> <log_properties> <inputpath> <outputpath>"
@@ -36,13 +35,6 @@ then
 
         if [ ! -d "$inputpath" ]; then 
                 echo "Input path '$inputpath' not found."
-                echo "Usage: <jar_file_location> <log_properties> <inputpath> <outputpath>"
-                echo "Exiting"
-                exit
-        fi
-
-        if [ ! -d "$outputpath" ]; then 
-                echo "Output path '$outputpath' not found."
                 echo "Usage: <jar_file_location> <log_properties> <inputpath> <outputpath>"
                 echo "Exiting"
                 exit
@@ -67,7 +59,9 @@ then
                 echo "All files for inputpath '$inputpath' already successfully processed. Exiting."
                 exit
         fi
+
         echo "Copy of sequence files to HDFS has finished."
+
 else
         echo "Copy of sequence files to HDFS is already running. Exiting"
 fi
