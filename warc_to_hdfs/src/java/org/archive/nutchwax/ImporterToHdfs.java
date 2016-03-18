@@ -267,13 +267,16 @@ public class ImporterToHdfs extends Configured implements Tool,
             }
         } finally {
             r.close();
-            if (success && System.getProperty("fullPathExecution").equals("true")) {
-                add2ProcessedFile(arcUrl);
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Completed ARC: " + arcUrl);
+            if (System.getProperty("fullPathExecution").equals("true")) {
+                if (!success) {
+                    add2ProceccedFailedFile(arcUrl);
                 }
+                add2ProcessedFile(arcUrl);
             }
 
+            if (LOG.isInfoEnabled()) {
+                LOG.info("Completed ARC: " + arcUrl);
+            }
         }
 
     }
@@ -895,32 +898,15 @@ public class ImporterToHdfs extends Configured implements Tool,
         return new File(path);
     }
 
-    private File getProcessedFile(String path) {
-        if (getProcessedPath() != null && !getProcessedPath().isEmpty()) {
-            path = getProcessedPath();
-        }
-
-        if (!path.endsWith("/")) {
-            path = path + "/";
-        }
-
-        path = path + ".processed";
-        File processed = new File(path);
-
-        if (!processed.exists()) {
-            try {
-                processed.createNewFile();
-            } catch (IOException e) {
-                System.out.println("Fatal error: " + e);
-                e.printStackTrace(System.out);
-            }
-        }
-
-        return processed;
+    private void add2ProcessedFile(String warcFile) {
+        add2File(warcFile, getProcessedFile(warcFile.substring(0, warcFile.lastIndexOf("/"))));
     }
 
-    private void add2ProcessedFile(String warcFile) {
-        File path = getProcessedFile(warcFile.substring(0, warcFile.lastIndexOf("/")));
+    private void add2ProceccedFailedFile(String warcFile) {
+        add2File(warcFile, getProcessedFailedFile(warcFile.substring(0, warcFile.lastIndexOf("/"))));
+    }
+
+    private void add2File(String warcFile, File path) {
         BufferedWriter output = null;
         try {
             output = new BufferedWriter(new FileWriter(path, true));
@@ -939,6 +925,38 @@ public class ImporterToHdfs extends Configured implements Tool,
                 }
             }
         }
+    }
+
+    private File getProcessedFile(String path) {
+        return getFile(path, ".processed");
+    }
+
+    private File getProcessedFailedFile(String path) {
+        return getFile(path, ".processingfailed");
+    }
+
+    private File getFile(String path, String filename) {
+        if (getProcessedPath() != null && !getProcessedPath().isEmpty()) {
+            path = getProcessedPath();
+        }
+
+        if (!path.endsWith("/")) {
+            path = path + "/";
+        }
+
+        path = path + filename;
+        File file = new File(path);
+
+        if (!file.exists()) {
+            try {
+                file.createNewFile();
+            } catch (IOException e) {
+                System.out.println("Fatal error: " + e);
+                e.printStackTrace(System.out);
+            }
+        }
+
+        return file;
     }
 
     private String getManifestPath() {
