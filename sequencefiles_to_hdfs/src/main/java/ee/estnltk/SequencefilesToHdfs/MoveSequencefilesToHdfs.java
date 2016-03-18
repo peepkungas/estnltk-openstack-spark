@@ -65,8 +65,10 @@ public class MoveSequencefilesToHdfs {
         File failed = new File(inputpath + "/.failed/" + filename);
         File failedMeta = new File(inputpath + "/.failed/" + meta);
 
+        Files.deleteIfExists(failed.toPath());
         FileUtils.moveFile(new File(file), failed);
         if (Files.exists(Paths.get(metafile))) {
+            Files.deleteIfExists(failedMeta.toPath());
             FileUtils.moveFile(new File(metafile), failedMeta);
         }
     }

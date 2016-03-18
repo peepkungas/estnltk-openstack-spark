@@ -29,7 +29,7 @@ then
                 exit
         fi
 
-        if [[ -n "$logfile" ]]; then 
+        if [ -n "$logfile" ]; then 
                 answer=`/bin/sh $file import_to_hdfs -p $path | tee -a $logfile`
         else
                 answer=`/bin/sh $file import_to_hdfs -p $path`
