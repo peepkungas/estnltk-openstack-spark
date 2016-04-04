@@ -36,9 +36,10 @@ This will process the sequencefiles and output the results into "hdfs:/kaarelt/p
 Known issues:
     * Running without spark-submit may crash when writing to files (socket closed error, pyspark issue)
 
-For automatic start use cron to call proccessing sequensfiles shell script (scripts/processSeqFilesStartup.sh).
+For automatic start use cron to call proccessing sequensfiles shell script (scripts/processSeqFilesStartup.sh <max_allowed_processes>).
 All neede parameters (inputpath, Outputhpath, processed file and spark-submit paramters) are defined in script (scripts/processSequencefiles.sh).
+    <max_allowed_processes> - If we have 9 cores in total, then 2 exections already use them all. If nothing specified 2 processes is default.
 
 Example:
 $ crontab -l
-$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/spark_estnltk/spark_estnltk/scripts/processSeqFilesStartup.sh
+$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/spark_estnltk/spark_estnltk/scripts/processSeqFilesStartup.sh 2
