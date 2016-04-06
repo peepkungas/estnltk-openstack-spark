@@ -9,7 +9,7 @@ esac
 done
 
 if [ ! -n "$processes" ]; then
-    processes=2
+    processes=1
 fi
 
 if [ $(ps aux | grep 'processSequencefiles.sh' | grep -v 'grep' | wc -l) -lt $processes ]; then

@@ -36,7 +36,7 @@ do
 
             echo $f >> "$processedFile"
             echo "Processing file $filesProcessed$filename"
-            `spark-submit --master yarn --deploy-mode cluster --num-executors 4 --conf spark.hadoop.validateOutputSpecs=false /opt/estnltk-openstack-spark/spark_estnltk/spark_estnltk/process.py $f $filesProcessed$filename -lemma -ner`
+            `spark-submit --master yarn --deploy-mode cluster --num-executors 4 --conf spark.hadoop.validateOutputSpecs=false /opt/estnltk-openstack-spark/spark_estnltk/spark_estnltk/process.py $f $filesProcessed$filename -lemma -ner -includeBoilerplate`
         fi
     fi
 done

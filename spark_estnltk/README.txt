@@ -38,7 +38,7 @@ Known issues:
 
 For automatic start use cron to call proccessing sequensfiles shell script (scripts/processSeqFilesStartup.sh <max_allowed_processes>).
 All neede parameters (inputpath, Outputhpath, processed file and spark-submit paramters) are defined in script (scripts/processSequencefiles.sh).
-    <max_allowed_processes> - If we have 9 cores in total, then 2 exections already use them all. If nothing specified 2 processes is default.
+    <max_allowed_processes> - If we have 9 cores in total, then 2 exections already use them all. If nothing specified 1 processes is default.
 
 Example:
 $ crontab -l
