@@ -30,7 +30,7 @@ Usage without submit : python process.py <inputpath> <outputpath> [<processnames
 Example:
 Let's have a YARN cluster with 4 executor nodes. We have three sequencefiles in "hdfs:/kaarelt/seqfiles" and wish to process them into "hdfs:/kaarelt/processresults". We wish to perform lemmatization and named entity recognition.
 1) Execute the command (where "/home/kaarelt/process.py" is the location of the spark_estnltk script):
-    spark-submit --master yarn-cluster --num-executors 4 /home/kaarelt/process.py hdfs:/kaarelt/seqfiles hdfs:/kaarelt/processresults -lemma  -ner 
+    spark-submit --master yarn-cluster --num-executors 4 /home/kaarelt/process.py hdfs:/kaarelt/seqfiles hdfs:/kaarelt/processresults -lemma  -ner
 This will process the sequencefiles and output the results into "hdfs:/kaarelt/processresults".
     
 Known issues:
@@ -42,4 +42,4 @@ All neede parameters (inputpath, Outputhpath, processed file and spark-submit pa
 
 Example:
 $ crontab -l
-$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/spark_estnltk/spark_estnltk/scripts/processSeqFilesStartup.sh 2
+$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/spark_estnltk/spark_estnltk/scripts/processSeqFilesStartup.sh
