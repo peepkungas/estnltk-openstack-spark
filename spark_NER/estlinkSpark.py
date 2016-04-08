@@ -115,15 +115,17 @@ def entitiesToSearchIn(line):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         print len(sys.argv)
-        print "estlinkSpark.py <inputPath> <csvFilePath>"
+        print "estlinkSpark.py <inputPath> <csvFilePath> [<outputPath>]"
         sys.exit()
 
     startTime = time.clock()
-
     inputPath = sys.argv[1]
     csvFilePath = sys.argv[2]
+
+    if len(sys.argv) > 3:
+        outputPath = sys.argv[3]
 
     conf = SparkConf()
 
@@ -157,8 +159,12 @@ if __name__ == "__main__":
     filtered = joined.filter(lambda line: filterEntities(line))
     # Clean the results by exploding the "hostname::path::datetime" keys and extracting only some of the values that interest us
     cleanedResults = filtered.flatMap(lambda line: cleanResult(line)).distinct()
-    # write results into a randomly numbered  folder under the "out" folder
-    cleanedResults.saveAsTextFile("out/out_" + str(random.randint(0, 10000)))
+    if len(sys.argv) == 4:
+        #write results into specified folder
+        cleanedResults.saveAsTextFile(outputPath)
+    else:
+        # write results into a randomly numbered folder under the "out" folder
+        cleanedResults.saveAsTextFile("out/out_" + str(random.randint(0, 10000)))
 
     spark.stop()
     endTime = time.clock()

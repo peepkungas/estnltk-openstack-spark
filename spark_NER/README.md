@@ -8,8 +8,9 @@ Comma delimmited CSV file, which contains full list of name entities which shoul
 
 - [inputPath] - Path to the folder/file containing output of spark_estnltk -ner process
 - [csvFilePath] - Path to the file containing entity entries
+- [outputPath] - Path to the output folder. Output path is optional. If output path is not specified results will be publised to out/out_<random_4_digit_nr>
 
-spark-submit --master local[4] estlinkSpark.py [inputPath] [csvFilePath]
+spark-submit --master local[4] estlinkSpark.py [inputPath] [csvFilePath] [outputPath]
 
 For the sample run lcoal files can be used.
 spark-submit --master local[4] estlinkSpark.py part-00000 spark-input-example.csv
