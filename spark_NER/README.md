@@ -15,6 +15,11 @@ spark-submit --master local[4] estlinkSpark.py [inputPath] [csvFilePath] [output
 For the sample run lcoal files can be used.
 spark-submit --master local[4] estlinkSpark.py part-00000 spark-input-example.csv
 
+For automatic start use cron to call proccessing sequensfiles shell script (scripts/processEstlinkSparkStartup.sh <max_allowed_processes>).
+All neede parameters (inputpath, Outputhpath, processed file and spark-submit paramters) are defined in script (scripts/processEstlinkSpark.sh).
+    <max_allowed_processes> - If we have 9 cores in total, then 2 exections already use them all. If nothing specified 1 processes is default.
 
-
+Example:
+$ crontab -l
+$ 0 * * * * /bin/sh /home/kaarelt/estnltk-openstack-spark/spark_NER/scripts/processEstlinkSparkStartup.sh
 
