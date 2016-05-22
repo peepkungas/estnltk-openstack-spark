@@ -445,14 +445,16 @@ public class ImporterToHdfs extends Configured implements Tool,
             } catch (MalformedURLException e1) {
                 LOG.error("Malformed URL Exception: " + e1.getMessage());
             }
+            String protocol = url_h.getProtocol();
             String hostname = url_h.getHost();
             String urlpath = url_h.getPath();
-            // LOG.info("HOST:"+ hostname);
-            // LOG.info("PATH:"+ urlpath);
+            //LOG.info("HOST:"+ hostname);
+            //LOG.info("PATH:"+ urlpath);
+            //LOG.info("PROTOCOL:"+ protocol);
 
             String date = meta.getDate();
             // LOG.info("meta date: " + date);
-            Text key_h = new Text(hostname + "::" + urlpath + "::" + date);
+            Text key_h = new Text(protocol + "::" + hostname + "::" + urlpath + "::" + date);
             Text value = new Text(htmlraw);
             try {
                 LOG.info("len: " + writer.getLength() + ", key: " + key_h + ", value len: " + value.getLength());

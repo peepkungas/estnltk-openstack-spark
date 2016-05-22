@@ -80,9 +80,11 @@ public class WarcToHdfsParseFilter implements HtmlParseFilter {
         } catch (MalformedURLException e) {
             LOG.error("Malformed URL Exception: " + e.getMessage());
         }
-
+        
+        String protocol = url.getProtocol();
         String hostname = url.getHost();
         String urlpath = url.getPath();
+        LOG.info("PROTOCOL:" + protocol);
         LOG.info("HOST:" + hostname);
         LOG.info("PATH:" + urlpath);
 
@@ -100,7 +102,7 @@ public class WarcToHdfsParseFilter implements HtmlParseFilter {
             Path path = new Path("./sequencefiles/sf_" + randomGenerator.nextInt(Integer.MAX_VALUE));
             Text key = new Text();
             Text value = new Text();
-            key.set(hostname + "::" + urlpath + "::" + date);
+            key.set(protocol + "::" + hostname + "::" + urlpath + "::" + date);
             value.set(htmlraw);
             writer = SequenceFile.createWriter(fs, conf, path, key.getClass(), value.getClass());
             LOG.info("len: " + writer.getLength() + ", key: " + key + ", value len: " + value.getLength());
