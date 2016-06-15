@@ -448,13 +448,15 @@ public class ImporterToHdfs extends Configured implements Tool,
             String protocol = url_h.getProtocol();
             String hostname = url_h.getHost();
             String urlpath = url_h.getPath();
-            //LOG.info("HOST:"+ hostname);
-            //LOG.info("PATH:"+ urlpath);
-            //LOG.info("PROTOCOL:"+ protocol);
+            String param = url_h.getQuery();
+            //LOG.info("HOST:" + hostname);
+            //LOG.info("PATH:" + urlpath);
+            //LOG.info("PROTOCOL:" + protocol);
+            //LOG.info("PARAM: " + param);
 
             String date = meta.getDate();
             // LOG.info("meta date: " + date);
-            Text key_h = new Text(protocol + "::" + hostname + "::" + urlpath + "::" + date);
+            Text key_h = new Text(protocol + "::" + hostname + "::" + urlpath + "::" + param + "::" + date);
             Text value = new Text(htmlraw);
             try {
                 LOG.info("len: " + writer.getLength() + ", key: " + key_h + ", value len: " + value.getLength());

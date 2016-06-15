@@ -84,9 +84,11 @@ public class WarcToHdfsParseFilter implements HtmlParseFilter {
         String protocol = url.getProtocol();
         String hostname = url.getHost();
         String urlpath = url.getPath();
-        LOG.info("PROTOCOL:" + protocol);
-        LOG.info("HOST:" + hostname);
-        LOG.info("PATH:" + urlpath);
+        String param = url.getQuery();
+        //LOG.info("PROTOCOL:" + protocol);
+        //LOG.info("HOST:" + hostname);
+        //LOG.info("PATH:" + urlpath);
+        //LOG.info("PARAM:" + param);
 
         // TODO: date is not found
         LOG.info("meta date: " + metadata.GENERATE_TIME_KEY);
@@ -102,7 +104,7 @@ public class WarcToHdfsParseFilter implements HtmlParseFilter {
             Path path = new Path("./sequencefiles/sf_" + randomGenerator.nextInt(Integer.MAX_VALUE));
             Text key = new Text();
             Text value = new Text();
-            key.set(protocol + "::" + hostname + "::" + urlpath + "::" + date);
+            key.set(protocol + "::" + hostname + "::" + urlpath + "::" + param + "::" + date);
             value.set(htmlraw);
             writer = SequenceFile.createWriter(fs, conf, path, key.getClass(), value.getClass());
             LOG.info("len: " + writer.getLength() + ", key: " + key + ", value len: " + value.getLength());
