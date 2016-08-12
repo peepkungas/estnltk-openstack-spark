@@ -62,7 +62,7 @@ def parseData(line):
     """
     if len(line)< 10:
         return None
-    x, y = ast.literal_eval(line.encode("utf-8"))
+    x, y = ast.literal_eval(line.encode("raw_unicode_escape","replace"))
     
     # x - hostname::path::date
     # y - dictionary
@@ -95,7 +95,7 @@ def parseEntities(line):
     """
     Parses known entities from text line to tuple.
     """
-    line = line.encode("utf-8")
+    line = line.encode("raw_unicode_escape","replace")
     # split values by comma which represents separator and assign them into a tuple.
     values = line.split(",")
     # discard lines which contain less than nine columns
@@ -108,12 +108,15 @@ def parseEntities(line):
 def cleanEntityName(name):
     """
     Cleans a name by stripping whitespaces and transforming it into lowercase.
-    Words shorter than 2 characters are removed.
+    Certain words of length 2 or less are removed.
     """
+    name = name.strip("'")
+    name = name.strip('"')
     parts = name.split(" ")
     name = ""
     for part in parts:
-        if len(part) > 2:
+        if len (part) > 2:
+        #if part not in filteredWords:
             name = name + " " + part
     name = name.lower().strip()
     return name
@@ -128,31 +131,15 @@ def extractOrgFromEntity(entity):
     """
     Returns organization data from known entity row.
     """
-    return (entity[organizationIdIx],entity[organizationNameIx])
-
-
-def extractEntitiesMatchingTag(onePageDict,tag):
-    """
-    Explodes named entities which type matches the provided tag.
-    Returns (entity,dictionary) pairs.
-    """
-    entities = onePageDict["named_entities"]
-    labels = onePageDict["named_entity_labels"]
-    # for multiple possibilities, create one of each
-    
-    entitiesWithLabels = zip(entities,labels)
-    matchingEntitiesWithLabels = filter(lambda onePair : onePair[1] == tag, entitiesWithLabels)
-    
-    return map(lambda onePair : (onePair[0],onePageDict), matchingEntitiesWithLabels)
-    
+    return (entity[organizationIdIx],entity[organizationNameIx])  
 
 def cleanNerResult(nerResultDict):
     """
     Splits multiple possibility names (separated by "|")
-    Turns each name in 'named_entities' into lowercase and removes words of length 2 or less.
+    Turns each name in 'named_entities' into lowercase and filters out words of length 2 or less.
     """
     named_entities = nerResultDict['named_entities']
-    
+    named_entities = list(set(named_entities))
     splitNamedEntities = []
     for oneNameBlock in named_entities:
         nameAlternatives = []
@@ -170,54 +157,55 @@ def cleanNerResult(nerResultDict):
         splitNamedEntities += nameAlternatives
             
     # turn lowercase and remove words of len 2 or less
-    nerResultDict['named_entities'] = map(lambda oneEntity : cleanEntityName(oneEntity), splitNamedEntities)
+    cleanedEntityNames = map(lambda oneEntity : cleanEntityName(oneEntity), splitNamedEntities)
+    nerResultDict["alternative_named_entities"] = splitNamedEntities
+    nerResultDict["named_entity_keys"] = filter(lambda name : len(name) > 2, cleanedEntityNames)
     return nerResultDict
 
 def removeDuplicatesFromNerResult(nerResultDict):
     """
-    Removes duplicate named entities from 'named_entities' in nerResultDict.
+    Removes duplicate named entities from "named_entity_keys" in nerResultDict.
     """
-    named_entities = nerResultDict['named_entities']
-    nerResultDict['named_entities'] = list(set(named_entities))
+    named_entities = nerResultDict["named_entity_keys"]
+    nerResultDict["named_entity_keys"] = list(set(named_entities))
     return nerResultDict
 
 def performKeyMatching(nerInputDict,knownEntityKeySet_broadcast_PER,knownEntityKeySet_broadcast_ORG):
     """
     Attempts to match each unknown named entity key to known entity keys.
     Input: 
-        nerInputDict - dictionary with "named_entities" to be matched
+        nerInputDict - dictionary with "named_entity_keys" to be matched
         knownEntityKeySet_broadcast_PER - set of keys of known persons 
         knownEntityKeySet_broadcast_ORG - set of keys of known organizations
     """
-    if not "named_entities" in nerInputDict.keys():
+    if not "named_entity_keys" in nerInputDict.keys():
         return nerInputDict 
     if flag_ignoreNamedEntityLabels == False and not "named_entity_labels" in nerInputDict.keys():
         return nerInputDict 
     
-    named_entities = nerInputDict["named_entities"]
+    named_entity_keys = nerInputDict["named_entity_keys"]
     
     # find matches to known persons and organizations 
     # we don't assume type tags to be correct, therefore try matching to both PER and ORG for all entries
-    matchingResults_PER = map(lambda oneNamedEntity : matchToKnown(oneNamedEntity,knownEntityKeySet_broadcast_PER), named_entities)
-    matchingResults_ORG = map(lambda oneNamedEntity : matchToKnown(oneNamedEntity,knownEntityKeySet_broadcast_ORG), named_entities)
+    matchingResults_PER = map(lambda oneNamedEntity : matchToKnown(oneNamedEntity,knownEntityKeySet_broadcast_PER), named_entity_keys)
+    matchingResults_ORG = map(lambda oneNamedEntity : matchToKnown(oneNamedEntity,knownEntityKeySet_broadcast_ORG), named_entity_keys)
 
     # retrieve successfully matched names
-    matchedNamedEntities_PER = [name[0] for name in matchingResults_PER if name[1] == True]
-    matchedNamedEntities_ORG = [name[0] for name in matchingResults_ORG if name[1] == True]
+    matchedNamedEntityKeys_PER = [name[0] for name in matchingResults_PER if name[1] == True]
+    matchedNamedEntityKeys_ORG = [name[0] for name in matchingResults_ORG if name[1] == True]
 
     # retrieve unmatched names
     unmatchedNamedEntities_PER = [name[0] for name in matchingResults_PER if name[1] == False]
     unmatchedNamedEntities_ORG = [name[0] for name in matchingResults_ORG if name[1] == False]
-    unmatchedNamedEntities = list(set(unmatchedNamedEntities_PER + unmatchedNamedEntities_ORG))
-    
+    unmatchedNamedEntityKeys = list( set.intersection(set(unmatchedNamedEntities_PER),set(unmatchedNamedEntities_ORG)) ) 
     outputDict = dict()
     outputDict["hostname"] = nerInputDict["hostname"]
     outputDict["path"] = nerInputDict["path"]
     outputDict["date"] = nerInputDict["date"]
-    outputDict["matchedNamedEntities_PER"] = matchedNamedEntities_PER    
-    outputDict["matchedNamedEntities_ORG"] = matchedNamedEntities_ORG
-    outputDict["unmatchedNamedEntitites"] = unmatchedNamedEntities
-    
+    outputDict["alternative_named_entities"] = nerInputDict["alternative_named_entities"]
+    outputDict["matchedNamedEntityKeys_PER"] = matchedNamedEntityKeys_PER    
+    outputDict["matchedNamedEntityKeys_ORG"] = matchedNamedEntityKeys_ORG
+    outputDict["unmatchedNamedEntityKeys"] = unmatchedNamedEntityKeys
     return outputDict
     
     
@@ -232,40 +220,6 @@ def matchToKnown(oneNamedEntity, knownNamesColl_broadcast):
     else:
         return (oneNamedEntity,False)
 
-def matchedPageDataToMatchedPairs(oneResult,knownEntityKeySet_broadcast_PER,knownEntityKeySet_broadcast_ORG):
-    """
-    Maps matchings of one page into (name,type,pagedata),[(knownEntityInfo)] pairs
-    """
-    knownEntityKeySet_PER = knownEntityKeySet_broadcast_PER.value
-    knownEntityKeySet_ORG = knownEntityKeySet_broadcast_ORG.value
-    pairs_PER = oneResult["entityMatchingPairs_PER"]
-    pairs_ORG = oneResult["entityMatchingPairs_ORG"]
-
-    pageData = (oneResult["hostname"],oneResult["path"],oneResult["date"])
-
-    res = {}
-    for onePair in pairs_PER:
-        name = onePair[0]
-        matchedEntityTags = onePair[1]
-        matchedEntities = []
-        for oneTag in matchedEntityTags:
-            matchedEntityDict = knownEntityKeySet_PER[oneTag]
-            knownData_PER = [matchedEntityDict[0],matchedEntityDict[1],matchedEntityDict[2],matchedEntityDict[3]]
-            matchedEntities.append(knownData_PER)
-        res[(name, "PER", pageData)] = matchedEntities
-
-    for onePair in pairs_ORG:
-        name = onePair[0]
-        matchedEntityTags = onePair[1]
-        matchedEntities = []
-        for oneTag in matchedEntityTags:
-            matchedEntityDict = knownEntityKeySet_ORG[oneTag]
-            knownData_ORG = [matchedEntityDict[organizationIdIx],matchedEntityDict[organizationNameIx]]
-            matchedEntities.append(knownData_ORG)
-        res[(name, "ORG", pageData)] = matchedEntities
-
-    return res
-
 def countNumberOfMatches(nameMatchesPair):
     """
     Calculates the number of matches to the name
@@ -276,79 +230,93 @@ def countNumberOfMatches(nameMatchesPair):
 
 def performDataRetrieval(oneResult,knownEntityDict_broadcast_PER,knownEntityDict_broadcast_ORG):
     """
-    For each key in oneResult["matchedNamedEntities_PER"] and oneResult["matchedNamedEntities_ORG"],
+    For each key in oneResult["matchedNamedEntityKeys_PER"] and oneResult["matchedNamedEntityKeys_ORG"],
     retrieve the matching known entity data from knownEntityDict_broadcast_PER or knownEntityDict_broadcast_ORG.
     If multiple entities match the same key, attempt to find a correct PER-ORG pair using line hashes. 
     """
-    matchedNamedEntities_PER = oneResult["matchedNamedEntities_PER"]
-    matchedNamedEntities_ORG = oneResult["matchedNamedEntities_ORG"]
+    matchedNamedEntityKeys_PER = oneResult["matchedNamedEntityKeys_PER"]
+    matchedNamedEntityKeys_ORG = oneResult["matchedNamedEntityKeys_ORG"]
     
     # retrieve line hashes and single possibility entity data
-    hashSet_PER, matchedEntityDataList_PER, multipleMatchesList_PER = retrieveDataAndHashes(matchedNamedEntities_PER,knownEntityDict_broadcast_PER)
-    hashSet_ORG, matchedEntityDataList_ORG, multipleMatchesList_ORG = retrieveDataAndHashes(matchedNamedEntities_ORG,knownEntityDict_broadcast_ORG)
+    hashSet_PER, singleMatchKeyEntityDataList_PER, multipleMatchesKeyHashAndEntityDataPairList_PER = retrieveDataAndHashes(matchedNamedEntityKeys_PER,knownEntityDict_broadcast_PER)
+    hashSet_ORG, singleMatchKeyEntityDataList_ORG, multipleMatchesKeyHashAndEntityDataPairList_ORG = retrieveDataAndHashes(matchedNamedEntityKeys_ORG,knownEntityDict_broadcast_ORG)
    
     # cross-reference multiple possibility entities to line hashes
-    crossMatchedEntityDataList_PER, uncrossMatchedEntityDataList_PER = performCrossMatching(multipleMatchesList_PER,hashSet_ORG)
-    crossMatchedEntityDataList_ORG, uncrossMatchedEntityDataList_ORG = performCrossMatching(multipleMatchesList_ORG,hashSet_PER)
+    crossmatchedKeyEntityDataList_PER, uncrossmatchedKeyEntityCountList_PER = performCrossMatching(multipleMatchesKeyHashAndEntityDataPairList_PER,hashSet_ORG)
+    crossmatchedKeyEntityDataList_ORG, uncrossmatchedKeyEntityCountList_ORG = performCrossMatching(multipleMatchesKeyHashAndEntityDataPairList_ORG,hashSet_PER)
      
-    # TODO?: if two possibilities both have a matching cross-reference, do something different?
+    #TODO?: if two possibilities both have a matching cross-reference, do something different?
      
-    oneResult["singleMatchedEntities_PER"] = matchedEntityDataList_PER
-    oneResult["crossMatchedEntities_PER"] = crossMatchedEntityDataList_PER
-    oneResult["uncrossMatchedEntities_PER"] = uncrossMatchedEntityDataList_PER
+    oneResult["singleMatchedEntities_PER"] = singleMatchKeyEntityDataList_PER
+    oneResult["crossMatchedEntities_PER"] = crossmatchedKeyEntityDataList_PER
+    if flag_doUncrossmatchedEntityDataOutput:
+        oneResult["uncrossMatchedEntities_PER"] = uncrossmatchedKeyEntityCountList_PER
     
-    oneResult["singleMatchedEntities_ORG"] = matchedEntityDataList_ORG
-    oneResult["crossMatchedEntities_ORG"] = crossMatchedEntityDataList_ORG
-    oneResult["uncrossMatchedEntities_ORG"] = uncrossMatchedEntityDataList_ORG
+    oneResult["singleMatchedEntities_ORG"] = singleMatchKeyEntityDataList_ORG
+    oneResult["crossMatchedEntities_ORG"] = crossmatchedKeyEntityDataList_ORG
+    if flag_doUncrossmatchedEntityDataOutput:
+        oneResult["uncrossMatchedEntities_ORG"] = uncrossmatchedKeyEntityCountList_ORG
     
-    del oneResult["matchedNamedEntities_PER"]
-    del oneResult["matchedNamedEntities_ORG"]
+    del oneResult["matchedNamedEntityKeys_PER"]
+    del oneResult["matchedNamedEntityKeys_ORG"]
     
     return oneResult
             
-def retrieveDataAndHashes(matchedNamedEntities,knownEntityDict_broadcast):            
+def retrieveDataAndHashes(matchedNamedEntityKeys,knownEntityDict_broadcast):
     """
-    For each key in matchedNamedEntities, retrieve data from knownEntityDict.
-    Return set of all matched line hashes, list of data of confirmed matches, list of multi-possibility matches 
-    """
+    For each name key in matchedNamedEntitityKeys, retrieve the corresponding entity data from knownEntityDict_broadcast.
+    Returns set of all hashes, entity data of single-matches, hash-and-entity-data of multi-matches.
+    """            
     knownEntityDict = knownEntityDict_broadcast.value
-    hashes = []
-    namedEntityDataList = []
-    multipleMatchesList = []
+    allHashes = []
+    singleMatchKeyEntityDataList = []
+    multipleMatchesKeyHashAndEntityDataList = []
     
-    for oneName in matchedNamedEntities:
-        if len(oneName) == 1:
-            oneKnownNameKey = oneName[0]
-            oneKnownEntityData = list(knownEntityDict[oneKnownNameKey])
-            hashes = hashes + oneKnownEntityData[0]
-            namedEntityDataList.append(oneKnownEntityData[1])
-        elif len(oneName) > 1:
-            for oneEntity in oneName:
-                oneKnownNameKey = oneName[0]
-                oneKnownEntityData = list(knownEntityDict[oneKnownNameKey])
-                hashes.append(oneKnownEntityData[0])
-                multipleMatchesList.append(oneEntity)
-    hashesSet = set(hashes)
-    return hashesSet, namedEntityDataList, multipleMatchesList
+    for oneKnownNameKey in matchedNamedEntityKeys:
+        knownEntityPairsList = list(knownEntityDict[oneKnownNameKey]) ## list of [([hashes], (name,id) )] pairs
+        if len(knownEntityPairsList) == 1: ## A single known entity matches the key
+            for oneKnownEntityDataPair in knownEntityPairsList:  
+                hashes = list(oneKnownEntityDataPair[0])
+                allHashes = allHashes + list(hashes)
+                keyAndEntityDataPair = (oneKnownNameKey, oneKnownEntityDataPair[1])
+                singleMatchKeyEntityDataList.append(keyAndEntityDataPair)
+        elif len(knownEntityPairsList) > 1: ## Multiple known entities match the key
+            hashesAndEntityDataPairList = []
+            for oneKnownEntityDataPair in knownEntityPairsList:  
+                hashes = list(oneKnownEntityDataPair[0])
+                allHashes = allHashes + list(hashes)
+                keyAndHashesAndEntityDataPair = (oneKnownNameKey, oneKnownEntityDataPair) 
+                hashesAndEntityDataPairList.append(oneKnownEntityDataPair) 
+            multipleMatchesKeyHashAndEntityDataList.append( (oneKnownNameKey, hashesAndEntityDataPairList) ) ## (key, [([hashes], (id, name)]))
 
-def performCrossMatching(multipleMatchesList,hashSet):
+    hashesSet = set(allHashes)
+    return hashesSet, singleMatchKeyEntityDataList, multipleMatchesKeyHashAndEntityDataList
+
+def performCrossMatching(multipleMatchesHashAndEntityDataPairList,otherTypeHashSet):
     """
     Checks if multiple possibilities for matching entities can be narrowed down by PER-ORG data.
-    If a common data line hash exists for multiple possibilities, choose the matching one. 
+    If a common hash exists between an ORG entity and any entity from PER, retrieve it.
+    If multiple matches are found, then unable to narrow down, add to unmatched entity list?
     """
-    matchedNamedEntityDataList = list()
-    unmatchedNamedEntityDataList = list()
-    for oneMultiPossibilityEntity in multipleMatchesList:
+    matchedNamedEntityKeyDataList = []
+    unmatchedNamedEntityKeyDataList = []
+    for oneKeyHashAndEntityDataTuple in multipleMatchesHashAndEntityDataPairList: ## (key, [([hashes], (id, name)]))
+        oneKey = oneKeyHashAndEntityDataTuple[0]
+        oneHashAndEntityDataPairList = oneKeyHashAndEntityDataTuple[1]
         matchFound = False
-        for oneHash in oneMultiPossibilityEntity[0]:
-            if oneHash in hashSet:
-                matchedNamedEntityDataList.append(oneMultiPossibilityEntity[1])
-                matchFound = True
+        for oneHashAndEntityDataPair in oneHashAndEntityDataPairList: ## Cross-reference entity candidate hashes to other type hashes
+            hashes = list(oneHashAndEntityDataPair[0])
+            for oneHash in hashes:
+                if oneHash in otherTypeHashSet:
+                    matchFound = True
+                    break
+            if matchFound == True: ## Successful cross-matching, ignore others?
+                entityData = oneHashAndEntityDataPair[1]
+                matchedNamedEntityKeyDataList.append( (oneKey,entityData) )
                 break
-        if matchFound == False:
-            unmatchedNamedEntityDataList.append(oneMultiPossibilityEntity[1])
-
-    return matchedNamedEntityDataList, unmatchedNamedEntityDataList
+        if matchFound == False: ## Unsuccessful cross-matching
+            unmatchedNamedEntityKeyDataList.append( (oneKey,len(oneHashAndEntityDataPairList)) )
+    return matchedNamedEntityKeyDataList, unmatchedNamedEntityKeyDataList
 
 
 if __name__ == "__main__":
@@ -362,7 +330,13 @@ if __name__ == "__main__":
     organizationNameIx = 5
     hashIx = 10
     
-    flag_ignoreNamedEntityLabels = True
+    flag_doAllKnownEntityKeysOutput = False ## if True, output the lists of all known entity keys to data_PER and data_ORG directories 
+    flag_ignoreNamedEntityLabels = True ## if True, ignore PER and ORG tags found from NLTK
+    flag_doUncrossmatchedEntityDataOutput = True ## if True, output key and candidate count for each unsuccessful cross-matching
+    flag_doMatchingOutput = False ## If True, output matched/unmatched keys to "/matching" directory
+    #TODO: improve list of filtered words in names
+    filteredWords = ["as","kü","oü"]
+    
     
     if len(sys.argv) < 4:
         print len(sys.argv)
@@ -373,7 +347,7 @@ if __name__ == "__main__":
                 """
         sys.exit()
 
-    startTime = time.clock()
+    startTime = time.time()
     manifestPath = sys.argv[1]
     csvFilePath = sys.argv[2]
     outputPath = sys.argv[3]
@@ -396,8 +370,9 @@ if __name__ == "__main__":
     #  Process known entity data into matchable names
     ################
     print("Processing known entity data csv file...")
+    knownEntityProcessingStartTime = time.time()
     # load file with known entity data (person + organization data rows)
-    knownEntitiesFile = spark.textFile(csvFilePath)
+    knownEntitiesFile = spark.textFile(csvFilePath,use_unicode=True)
 
     # parse known entity file lines into tuples
     # filter out invalid lines
@@ -405,93 +380,86 @@ if __name__ == "__main__":
     hash_KnownEntityData_PairRDD = knownEntitiesFile.map(lambda line: parseEntities(line)).filter(lambda entry: entry is not None)
 
     # Extract person info from known entity lists
-    # Bind each person to its data lines
+    # Group line hashes by PER data
     # result pair : ((per_id, per_firstname, per_lastname), [matching_line_hashes])    
     personData_MatchingHashes_PairRDD = hash_KnownEntityData_PairRDD.map(lambda entity: (extractPerFromEntity(entity[1]), entity[0]) ).groupByKey()
 
-    # clean name for PER matching
+    # clean name for PER matching (lowercase with len <3 words removed)
     # result pair : ("firstname lastname", ([ [matching_line_hashes],(per_id,per_firstname,per_lastname) ) ])
-    matchableName_HashAndData_PairRDD_PER = personData_MatchingHashes_PairRDD.map(lambda entity : (cleanEntityName("{} {}".format(entity[0][1].strip('"'),entity[0][2].strip('"'))), (entity[1], entity[0]) ) )
+    matchableName_HashAndData_PairRDD_PER = personData_MatchingHashes_PairRDD.map(lambda entity : (cleanEntityName("{} {}".format(entity[0][1],entity[0][2])), (entity[1], entity[0]) ) )
     knownEntityKeySet_broadcast_PER = spark.broadcast(set(matchableName_HashAndData_PairRDD_PER.groupByKey().keys().collect()))
     knownEntityDict_broadcast_PER = spark.broadcast(dict(matchableName_HashAndData_PairRDD_PER.groupByKey().collect()))
-    
+
     # Extract organization info from known entity rows
-    # Bind each organization to its data lines
+    # Group line hashes by ORG data
     # result pair : ((org_id, org_name), [matching_line_hashes]) 
     orgData_MatchingHashes_PairRDD = hash_KnownEntityData_PairRDD.map(lambda entity: (extractOrgFromEntity(entity[1]), entity[0]) ).groupByKey()
 
-    # clean name for ORG matching
+    # clean name for ORG matching (lowercase with len <3 words removed)
     # result pair : ("orgname", ([ [matching_line_hashes],(org_id,org_name) ) ])
-    matchableName_HashAndData_PairRDD_ORG = orgData_MatchingHashes_PairRDD.map(lambda entity : (cleanEntityName(entity[0][1].strip('"')), ( entity[1], entity[0] ) ))
+    matchableName_HashAndData_PairRDD_ORG = orgData_MatchingHashes_PairRDD.map(lambda entity : (cleanEntityName(entity[0][1]), ( entity[1], entity[0] ) )).filter(lambda keyPair: len(keyPair[0])>0 )
     knownEntityKeySet_broadcast_ORG = spark.broadcast(set(matchableName_HashAndData_PairRDD_ORG.groupByKey().keys().collect()))
-    knownEntityDict_broadcast_ORG = spark.broadcast(dict(matchableName_HashAndData_PairRDD_ORG.groupByKey().collect()))
+    knownEntityDict_broadcast_ORG = spark.broadcast(matchableName_HashAndData_PairRDD_ORG.groupByKey().collectAsMap())
 
+    if flag_doAllKnownEntityKeysOutput: ## if true, output all matchable keys
+        matchableName_HashAndData_PairRDD_PER.groupByKey().keys().saveAsTextFile(outputPath+"/data_PER")
+        matchableName_HashAndData_PairRDD_ORG.groupByKey().keys().saveAsTextFile(outputPath+"/data_ORG")
 
-    ## DEBUG
-    matchableName_HashAndData_PairRDD_ORG.groupByKey().saveAsTextFile(outputPath+"/data_ORG")
-
+    knownEntityProcessingEndTime = time.time()
+    print("Known entity file processed in: " + str(knownEntityProcessingEndTime-knownEntityProcessingStartTime))
     
     ################
     # Parse manifest of unknown named entity input files
     ################
-    inputPathList = []
+    inputPathString = ""
     manifestFile = open(manifestPath,'r')
     for line in manifestFile:
-        inputPathList.append(line)
-
+        inputPathString = inputPathString + line.strip() +","
+    inputPathString = inputPathString.strip(",")
     ################
     # Process unknown named entities to matchable names
     ################
-    i=0
-    for inputPath in inputPathList:
-        i += 1
-        print("Processing unknown named entity input file: " + inputPath)
-        # load file with unknown named entities (NLTK results file)
-        try:
-            nerResultsFile = spark.textFile(inputPath)
-        except:
-            print("ERR: unable to open " + inputPath)
-            continue
-        # extract NER results from file
-        # each result element: dictionary with ['named_entities'],['hostname'],['path'],['date']
-        # filter out invalid (empty) results
-        nerResultDictRDD = nerResultsFile.map(lambda line: parseData(line)).filter(lambda entry: entry is not None)
-    
-        # clean names
-        # split if multiple possibilities ("|" separator in name)
-        cleanNerResultDictRDD = nerResultDictRDD.map(lambda nerResult : cleanNerResult(nerResult))
-        # remove duplicates
-        nerResultsRDD = cleanNerResultDictRDD.map(lambda nerResult : removeDuplicatesFromNerResult(nerResult))
-        
-        # DEBUG
-        nerResultsRDD.saveAsTextFile(outputPath + str(i) + "/cleaned_ner")
-    
-    
-    
-        ################
-        # Matching : match each name in each NER result dict to known entities
-        ################
-        print("Matching unknown names to known entities...")
-        # Returns : NER result dicts with added ['matchedNamedEntities_PER'],['matchedNamedEntities_ORG'],['unmatchedNamedEntities']
-        matchedNerResultsRDD = nerResultsRDD.map(lambda oneResult : performKeyMatching(oneResult,knownEntityKeySet_broadcast_PER,knownEntityKeySet_broadcast_ORG))
-        
-        # DEBUG
-        matchedNerResultsRDD.saveAsTextFile(outputPath+ str(i) + "/matching")
-    
-    
-        ################
-        # Data retrieval : 
-        #  if one match, retrieve
-        #  if multiple matches, search for PER-ORG line hashes that match 
-        ################
-        print("Retrieving matched entity data...")
-        entityDataRDD = matchedNerResultsRDD.map(lambda oneResult : performDataRetrieval(oneResult,knownEntityDict_broadcast_PER,knownEntityDict_broadcast_ORG))
-        
-        # Save result
-        entityDataRDD.saveAsTextFile(outputPath+ str(i) + "/entityData")
+    print("Processing unknown-named-entity input files...")
+    oneFileStartTime = time.time()
+    # extract NER results from file
+    nerResultsFile = spark.textFile(inputPathString,use_unicode=True)
+    # each result element: dictionary with ['named_entities'],['hostname'],['path'],['date']
+    # filter out invalid (empty) results
+    nerResultDictRDD = nerResultsFile.map(lambda line: parseData(line)).filter(lambda entry: entry is not None)
+    # clean names
+    # split if multiple possibilities ("|" separator in name)
+    cleanNerResultDictRDD = nerResultDictRDD.map(lambda nerResult : cleanNerResult(nerResult))
+    # remove duplicates
+    nerResultsRDD = cleanNerResultDictRDD.map(lambda nerResult : removeDuplicatesFromNerResult(nerResult))
 
-        print("Finished file: " + inputPath)
+    ################
+    # Matching : match each name in each NER result dict to known entities
+    ################
+    print("Matching unknown names to known entities...")
+    # Returns : NER result dicts with added ['matchedNamedEntities_PER'],['matchedNamedEntities_ORG'],['unmatchedNamedEntities']
+    matchedNerResultsRDD = nerResultsRDD.map(lambda oneResult : performKeyMatching(oneResult,knownEntityKeySet_broadcast_PER,knownEntityKeySet_broadcast_ORG))
+    nerResultsRDD.unpersist()
     
+    if flag_doMatchingOutput: ## Outputs matching results (matching and unmatching keys)
+        matchedNerResultsRDD.saveAsTextFile(outputPath + "/matching")
+
+
+    ################
+    # Data retrieval : 
+    #  if one match, retrieve
+    #  if multiple matches, search for PER-ORG line hashes that match 
+    ################
+    print("Retrieving matched entity data...")
+    entityDataRDD = matchedNerResultsRDD.map(lambda oneResult : performDataRetrieval(oneResult,knownEntityDict_broadcast_PER,knownEntityDict_broadcast_ORG))
+    matchedNerResultsRDD.unpersist()
+    
+    # Save result
+    entityDataRDD.saveAsTextFile(outputPath + "/entityData")
+
+    print("Finished unknown entity files.")
+    oneFileEndTime = time.time()
+    print("Time taken: " + str(oneFileEndTime - oneFileStartTime))
+    entityDataRDD.unpersist()
     spark.stop()
-    endTime = time.clock()
+    endTime = time.time()
     print "Time to finish:" + str(endTime - startTime)
