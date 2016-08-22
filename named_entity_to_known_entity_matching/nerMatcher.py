@@ -86,9 +86,22 @@ def parseData(line):
             y["named_entity_labels"] = y['ner']['named_entity_labels']
                         
     keyparts = x.split("::")
-    y['hostname'] = keyparts[0]
-    y['path'] = keyparts[1]
-    y['date'] = keyparts[2]
+    hostname = None
+    path = None
+    date = None
+    if len(keyparts) == 3:
+        hostname = keyparts[0]
+        path = keyparts[1]
+        date = keyparts[2]
+    elif len(keyparts) == 5:
+        protocol = keyparts [0]
+        hostname = keyparts[1]
+        path = keyparts[2]
+        params = keyparts[3]
+        date = keyparts[4]
+    y['hostname'] = hostname
+    y['path'] = path
+    y['date'] = date
     return y
 
 def parseEntities(line):
@@ -117,6 +130,8 @@ def cleanEntityName(name):
     for part in parts:
         if len (part) > 2:
         #if part not in filteredWords:
+            part = part.strip("'")
+            part = part.strip('"')
             name = name + " " + part
     name = name.lower().strip()
     return name
@@ -292,6 +307,71 @@ def retrieveDataAndHashes(matchedNamedEntityKeys,knownEntityDict_broadcast):
     hashesSet = set(allHashes)
     return hashesSet, singleMatchKeyEntityDataList, multipleMatchesKeyHashAndEntityDataList
 
+def performDataRetrievalFromDistributedDict(oneResult):
+    """
+    For each key in oneResult["matchedNamedEntityKeys_PER"] and oneResult["matchedNamedEntityKeys_ORG"],
+    retrieve the matching known entity data from knownEntityDict_RDD_PER or knownEntityDict_RDD_ORG.
+    If multiple entities match the same key, attempt to find a correct PER-ORG pair using line hashes. 
+    """
+    matchedNamedEntityKeys_PER = oneResult["matchedNamedEntityKeys_PER"]
+    matchedNamedEntityKeys_ORG = oneResult["matchedNamedEntityKeys_ORG"]
+    
+    # retrieve line hashes and single possibility entity data
+    hashSet_PER, singleMatchKeyEntityDataList_PER, multipleMatchesKeyHashAndEntityDataPairList_PER = retrieveDataAndHashesFromDistributedDict(matchedNamedEntityKeys_PER,knownEntityDict_RDD_PER)
+    hashSet_ORG, singleMatchKeyEntityDataList_ORG, multipleMatchesKeyHashAndEntityDataPairList_ORG = retrieveDataAndHashesFromDistributedDict(matchedNamedEntityKeys_ORG,knownEntityDict_RDD_ORG)
+   
+    # cross-reference multiple possibility entities to line hashes
+    crossmatchedKeyEntityDataList_PER, uncrossmatchedKeyEntityCountList_PER = performCrossMatching(multipleMatchesKeyHashAndEntityDataPairList_PER,hashSet_ORG)
+    crossmatchedKeyEntityDataList_ORG, uncrossmatchedKeyEntityCountList_ORG = performCrossMatching(multipleMatchesKeyHashAndEntityDataPairList_ORG,hashSet_PER)
+     
+    #TODO?: if two possibilities both have a matching cross-reference, do something different?
+     
+    oneResult["singleMatchedEntities_PER"] = singleMatchKeyEntityDataList_PER
+    oneResult["crossMatchedEntities_PER"] = crossmatchedKeyEntityDataList_PER
+    if flag_doUncrossmatchedEntityDataOutput:
+        oneResult["uncrossMatchedEntities_PER"] = uncrossmatchedKeyEntityCountList_PER
+    
+    oneResult["singleMatchedEntities_ORG"] = singleMatchKeyEntityDataList_ORG
+    oneResult["crossMatchedEntities_ORG"] = crossmatchedKeyEntityDataList_ORG
+    if flag_doUncrossmatchedEntityDataOutput:
+        oneResult["uncrossMatchedEntities_ORG"] = uncrossmatchedKeyEntityCountList_ORG
+    
+    del oneResult["matchedNamedEntityKeys_PER"]
+    del oneResult["matchedNamedEntityKeys_ORG"]
+    
+    return oneResult
+
+def retrieveDataAndHashesFromDistributedDict(matchedNamedEntityKeys,knownEntityDict_RDD):
+    """
+    For each name key in matchedNamedEntitityKeys, retrieve the corresponding entity data from knownEntityDict_RDD.
+    Returns set of all hashes, entity data of single-matches, hash-and-entity-data of multi-matches.
+    """            
+    knownEntityDict = knownEntityDict_RDD
+    allHashes = []
+    singleMatchKeyEntityDataList = []
+    multipleMatchesKeyHashAndEntityDataList = []
+    
+    for oneKnownNameKey in matchedNamedEntityKeys:
+        knownEntityPairsList = list(knownEntityDict.lookup(oneKnownNameKey)) ## list of [([hashes], (name,id) )] pairs
+        if len(knownEntityPairsList) == 1: ## A single known entity matches the key
+            for oneKnownEntityDataPair in knownEntityPairsList:  
+                hashes = list(oneKnownEntityDataPair[0])
+                allHashes = allHashes + list(hashes)
+                keyAndEntityDataPair = (oneKnownNameKey, oneKnownEntityDataPair[1])
+                singleMatchKeyEntityDataList.append(keyAndEntityDataPair)
+        elif len(knownEntityPairsList) > 1: ## Multiple known entities match the key
+            hashesAndEntityDataPairList = []
+            for oneKnownEntityDataPair in knownEntityPairsList:  
+                hashes = list(oneKnownEntityDataPair[0])
+                allHashes = allHashes + list(hashes)
+                keyAndHashesAndEntityDataPair = (oneKnownNameKey, oneKnownEntityDataPair) 
+                hashesAndEntityDataPairList.append(oneKnownEntityDataPair) 
+            multipleMatchesKeyHashAndEntityDataList.append( (oneKnownNameKey, hashesAndEntityDataPairList) ) ## (key, [([hashes], (id, name)]))
+
+    hashesSet = set(allHashes)
+    return hashesSet, singleMatchKeyEntityDataList, multipleMatchesKeyHashAndEntityDataList
+
+
 def performCrossMatching(multipleMatchesHashAndEntityDataPairList,otherTypeHashSet):
     """
     Checks if multiple possibilities for matching entities can be narrowed down by PER-ORG data.
@@ -330,7 +410,7 @@ if __name__ == "__main__":
     organizationNameIx = 5
     hashIx = 10
     
-    flag_doAllKnownEntityKeysOutput = False ## if True, output the lists of all known entity keys to data_PER and data_ORG directories 
+    flag_doAllKnownEntityKeysOutput = True ## if True, output the lists of all known entity keys to data_PER and data_ORG directories 
     flag_ignoreNamedEntityLabels = True ## if True, ignore PER and ORG tags found from NLTK
     flag_doUncrossmatchedEntityDataOutput = True ## if True, output key and candidate count for each unsuccessful cross-matching
     flag_doMatchingOutput = False ## If True, output matched/unmatched keys to "/matching" directory
@@ -388,8 +468,9 @@ if __name__ == "__main__":
     # result pair : ("firstname lastname", ([ [matching_line_hashes],(per_id,per_firstname,per_lastname) ) ])
     matchableName_HashAndData_PairRDD_PER = personData_MatchingHashes_PairRDD.map(lambda entity : (cleanEntityName("{} {}".format(entity[0][1],entity[0][2])), (entity[1], entity[0]) ) )
     knownEntityKeySet_broadcast_PER = spark.broadcast(set(matchableName_HashAndData_PairRDD_PER.groupByKey().keys().collect()))
-    knownEntityDict_broadcast_PER = spark.broadcast(dict(matchableName_HashAndData_PairRDD_PER.groupByKey().collect()))
-
+    knownEntityDict_broadcast_PER = spark.broadcast(matchableName_HashAndData_PairRDD_PER.groupByKey().collectAsMap())
+    #knownEntityDict_RDD_PER = matchableName_HashAndData_PairRDD_PER.groupByKey().sortByKey()
+ 
     # Extract organization info from known entity rows
     # Group line hashes by ORG data
     # result pair : ((org_id, org_name), [matching_line_hashes]) 
@@ -400,6 +481,7 @@ if __name__ == "__main__":
     matchableName_HashAndData_PairRDD_ORG = orgData_MatchingHashes_PairRDD.map(lambda entity : (cleanEntityName(entity[0][1]), ( entity[1], entity[0] ) )).filter(lambda keyPair: len(keyPair[0])>0 )
     knownEntityKeySet_broadcast_ORG = spark.broadcast(set(matchableName_HashAndData_PairRDD_ORG.groupByKey().keys().collect()))
     knownEntityDict_broadcast_ORG = spark.broadcast(matchableName_HashAndData_PairRDD_ORG.groupByKey().collectAsMap())
+    #knownEntityDict_RDD_ORG = matchableName_HashAndData_PairRDD_ORG.groupByKey().sortByKey()
 
     if flag_doAllKnownEntityKeysOutput: ## if true, output all matchable keys
         matchableName_HashAndData_PairRDD_PER.groupByKey().keys().saveAsTextFile(outputPath+"/data_PER")
@@ -451,6 +533,9 @@ if __name__ == "__main__":
     ################
     print("Retrieving matched entity data...")
     entityDataRDD = matchedNerResultsRDD.map(lambda oneResult : performDataRetrieval(oneResult,knownEntityDict_broadcast_PER,knownEntityDict_broadcast_ORG))
+    #entityDataRDD = matchedNerResultsRDD.map(lambda oneResult : performDataRetrievalFromDistributedDict(oneResult))
+    
+    
     matchedNerResultsRDD.unpersist()
     
     # Save result
