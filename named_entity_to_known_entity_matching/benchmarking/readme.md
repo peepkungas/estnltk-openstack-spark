@@ -14,6 +14,7 @@ The benchmark is created by manually processing the names detected from one inpu
 
 # Layout of benchmark input file
 The benchmark file is a work in process.
+## Column descriptions
 	* DOMAIN : domain name
 	* PATH : path in domain
 	* DATE : timestamp of page collection
