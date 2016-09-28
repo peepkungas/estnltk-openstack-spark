@@ -28,10 +28,11 @@ The benchmark file is a work in process.
 	* TAG2 : describes properties of this name. 
 	** faulty - contains errors, but may be understandable to a human
 	** multi - multiple entities match this name (name is too general to narrow down)
-	** famous - well-known person or international organization. 
+	** famous - well-known person (of any nationality), often with a dedicated wiki article.
+	** int - international or foreign organization, possibly well-known.
 	** ? - yet-unknown type or unknown matching entities. Caused by having multiple unusual matches or a lack of information.
 	* CLEANED_NAME : If TAG2=faulty, then the actual name when possible. If TAG2=?, then the name of most likely matching entity.
-	* WIKI_LINK : If TAG2=famous, link to the Wiki article of that name when available.
+	* WIKI_LINK : If TAG2=famous or TAG2=int, link to the wiki article of the name when available.
 	* REGISTRY_CODE_OR_BIRTHDATE_FROM_INFOREGISTER : If TAG=o, registration code of organization. If TAG=p, birthdate of person. If TAG2=multi, then this is a birthdate only if there is exactly one matching person and one or more matching organizations.
 	* ALTERNATE_POSSIBILITIES : (optional) script-collected data from Inforegister to assist data entry. Is not complete, has many missing fields.
 	* ALT_COUNT : (optional) count of possible matching entities. If it equals one, we can automate regcode/birthdate extraction
