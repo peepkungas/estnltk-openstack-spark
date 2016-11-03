@@ -102,6 +102,8 @@ def parseData(line):
     y['hostname'] = hostname
     y['path'] = path
     y['date'] = date
+    y['protocol'] = protocol
+    y['params'] = params
     return y
 
 def parseEntities(line):
@@ -217,6 +219,8 @@ def performKeyMatching(nerInputDict,knownEntityKeySet_broadcast_PER,knownEntityK
     outputDict["hostname"] = nerInputDict["hostname"]
     outputDict["path"] = nerInputDict["path"]
     outputDict["date"] = nerInputDict["date"]
+    outputDict["protocol"] = nerInputDict["protocol"]
+    outputDict["params"] = nerInputDict["params"]
     outputDict["alternative_named_entities"] = nerInputDict["alternative_named_entities"]
     outputDict["matchedNamedEntityKeys_PER"] = matchedNamedEntityKeys_PER    
     outputDict["matchedNamedEntityKeys_ORG"] = matchedNamedEntityKeys_ORG
