@@ -13,10 +13,13 @@ Known entity data is loaded into memory, so executor memory size has to accomoda
 * -m, --manifest : manifest file containing on each row the path of an input file/directory
 * -k, --known : path to CSV file containing known entity data (description below)
 * -o, --out : output path, target directory must not exist
+
 On first execution, the known entity database has to be created:
+
 > spark-submit --conf "spark.executor.memory=4g" --conf "spark.kryoserializer.buffer.max=1024m" named_entity_to_known_entity_matching/nerMatcher.py -m benchmarking/manifest_matching02.txt -k hdfs:/user/kaarelt/csv -x hdfs:/user/kaarelt/exclude -o hdfs:/user/kaarelt/benchmarking/firstfive/matching02x155 --processKnown
 
 On following executions, the database can be reused:
+
 > spark-submit --conf "spark.executor.memory=4g" --conf "spark.kryoserializer.buffer.max=1024m" named_entity_to_known_entity_matching/nerMatcher.py -m benchmarking/manifest_matching02.txt -k hdfs:/user/kaarelt/csv -x hdfs:/user/kaarelt/exclude -o hdfs:/user/kaarelt/benchmarking/firstfive/matching02x155
 
 
