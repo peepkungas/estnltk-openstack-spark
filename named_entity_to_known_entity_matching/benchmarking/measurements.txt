@@ -1,0 +1,227 @@
+
+2016 Oct 04 20:17 (x02)
+## old csv 
+--Same-URI set of regcodes based results--
+Precision 	 0.575757575758
+Recall   	 0.0674955595027
+F-score 	 0.120826709062
+
+2016 Oct 04 21:42 (x07)
+##new csv
+--Same-URI set of regcodes based results--
+Precision 	 0.633333333333
+Recall   	 0.0674955595027
+F-score 	 0.121990369181
+
+2016 Oct 17 18:53 (x35)
+## ORG matching fixed, some data mistakes fixed
+Retrieved = 534
+Relevant = 905
+-- single match PER --
+trueposlist: 151
+-- single match ORG --
+trueposlist: 145
+-- cross match PER --
+trueposlist: 0
+-- cross match ORG --
+trueposlist: 3
+n_truepos = 299
+n_falsepos = 235
+n_falseneg = 645
+Precision : 0.559925093633
+Recall : 0.330386740331
+F-score : 0.415566365532
+
+2016 Oct 17 19:03
+## Fixed csv data culling (filtering was faulty)
+Retrieved = 534
+Relevant = 649
+-- single match PER --
+trueposlist: 151
+-- single match ORG --
+trueposlist: 145
+-- cross match PER --
+trueposlist: 0
+-- cross match ORG --
+trueposlist: 3
+n_truepos = 299
+n_falsepos = 235
+n_falseneg = 470
+Precision : 0.559925093633
+Recall : 0.409589041096
+F-score : 0.473101265823
+
+2016 Oct 18 22:21
+## Fixed decoding for output (but not original input), something else too
+Retrieved = 534
+Relevant = 649
+-- single match PER --
+trueposlist: 151
+-- single match ORG --
+trueposlist: 143
+-- cross match PER --
+trueposlist: 0
+-- cross match ORG --
+trueposlist: 3
+n_truepos = 297
+n_falsepos = 237
+n_falseneg = 391
+Precision : 0.556179775281
+Recall : 0.457627118644
+F-score : 0.502113271344
+
+2016 Oct 19 03:26
+## Fixed umlauts
+Retrieved = 611
+Relevant = 649
+-- single match PER --
+trueposlist: 169
+-- single match ORG --
+trueposlist: 166
+-- cross match PER --
+trueposlist: 2
+-- cross match ORG --
+trueposlist: 3
+n_truepos = 340
+n_falsepos = 271
+n_falseneg = 354 ?
+Precision : 0.556464811784
+Recall : 0.523882896764
+F-score : 0.539682539683
+
+2016 Oct 26 01:59
+## added subname filtering
+Retrieved = 544
+Relevant = 649
+-- single match PER --
+trueposlist: 162
+-- single match ORG --
+trueposlist: 141
+-- cross match PER --
+trueposlist: 4
+-- cross match ORG --
+trueposlist: 2
+n_truepos = 309
+n_falsepos = 235
+n_falseneg = 359
+Precision : 0.568014705882
+Recall : 0.476117103236
+F-score : 0.518021793797
+
+2016 Oct 26 02:354
+## subname filter with uppercasing
+Retrieved = 529
+Relevant = 649
+-- single match PER --
+trueposlist: 161
+-- single match ORG --
+trueposlist: 131
+-- cross match PER --
+trueposlist: 6
+-- cross match ORG --
+trueposlist: 1
+n_truepos = 299
+n_falsepos = 230
+n_falseneg = 362
+Precision : 0.565217391304
+Recall : 0.460708782743
+F-score : 0.507640067912
+
+2016 Nov 15 20:04 (x101)
+## ~500 filter/synonym tag based filters/synonyms 
+## No changes, no exclusion hits
+## BUGGED : filtering was broken
+Retrieved = 529
+Relevant = 649
+-- single match PER --
+trueposlist: 161
+-- single match ORG --
+trueposlist: 131
+-- cross match PER --
+trueposlist: 6
+-- cross match ORG --
+trueposlist: 1
+n_truepos = 299
+n_falsepos = 230
+n_falseneg = 362
+Precision : 0.565217391304
+Recall : 0.460708782743
+F-score : 0.507640067912
+
+2016 Nov 15 22:00
+## Added first name filtering
+## BUGGED : filtering was broken
+Retrieved = 529
+Relevant = 649
+-- single match PER --
+trueposlist: 161
+-- single match ORG --
+trueposlist: 131
+-- cross match PER --
+trueposlist: 6
+-- cross match ORG --
+trueposlist: 1
+n_truepos = 299
+n_falsepos = 230
+n_falseneg = 362
+Precision : 0.565217391304
+Recall : 0.460708782743
+F-score : 0.507640067912
+
+2016 Nov 16 17:49 (x144)
+## Fixed filtering and synonyms
+## Umlaut exclusion seems broken
+Retrieved = 440
+Relevant = 649
+-- single match PER --
+trueposlist: 161
+-- single match ORG --
+trueposlist: 129
+-- cross match PER --
+trueposlist: 5
+-- cross match ORG --
+trueposlist: 1
+n_truepos = 296
+n_falsepos = 144
+n_falseneg = 365
+Precision : 0.672727272727
+Recall : 0.456086286595
+F-score : 0.543617998163
+
+2016 Nov 16 19:57 (x155)
+## Fixed non-ASCII exclusions
+Retrieved = 419
+Relevant = 649
+-- single match PER --
+trueposlist: 161
+-- single match ORG --
+trueposlist: 129
+-- cross match PER --
+trueposlist: 5
+-- cross match ORG --
+trueposlist: 1
+n_truepos = 296
+n_falsepos = 123
+n_falseneg = 365
+Precision : 0.706443914081
+Recall : 0.456086286595
+F-score : 0.554307116105
+
+2016 Nov 23 06:48 (x177)
+## Added ORG lemmatization, possible bugs
+Retrieved = 289
+Relevant = 649
+-- single match PER --
+trueposlist: 161
+-- single match ORG --
+trueposlist: 40
+-- cross match PER --
+trueposlist: 0
+-- cross match ORG --
+trueposlist: 0
+n_truepos = 201
+n_falsepos = 88
+n_falseneg = 454
+Precision : 0.695501730104
+Recall : 0.309707241911
+F-score : 0.428571428571
