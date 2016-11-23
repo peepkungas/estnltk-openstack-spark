@@ -26,4 +26,12 @@ Examples:
 > "EE",\N,\N,\N,\N,"123456","OrganizationName","2016-01-04","0000-00-00","ceo"
 
 # Result Contents
-See "examples" directory.
+* pageId : String composed of protocol, host, path, parameters, date. Separated by "::"
+* distinctNames : List of all distinct names detected from the page by ESTNLTK.
+* singleMatchedEntities_(PER/ORG) : Names (and entity data) with exactly one matching known entity.
+* crossmatchedEntities_(PER/ORG) : Names (and entity data) with more than one matching known entity, but narrowed down because of occurring with another matched entity of the other type.
+* nonCrossmatchedNames_(PER/ORG) : Names where narrowing down was not possible, therefore more than one matching entity exists.
+* matchlessNames : Names where no matches exist.
+* excludedNames : Names which were excluded from matching based on exclusion lists.
+* notMatchableNames_(PER/ORG) : Normally empty. Names which were not included to other lists (because of errors).
+
