@@ -1,10 +1,10 @@
 #!/bin/bash
 filesToProcessPath="/processed/"
-filesProcessed="/known_match_processed/"
+filesProcessed="hdfs:/known_match_processed/"
 processedFile="/opt/properties/known_match_processed/.processed"
 timestamp=`date --iso-8601=seconds`
 tmpManifestFile="/tmp/manifest_$timestamp.txt"
-knownEntityDataCSV="spark-input-30122015.csv"
+knownEntityDataCSV="hdfs:/user/ubuntu/csv"
 filesToProcess=`hadoop fs -ls $filesToProcessPath`
 
 echo "$tmpManifestFile"
@@ -43,7 +43,7 @@ do
 
             echo $f >> "$processedFile"
             echo "Processing file $filesProcessed$filename"
-            `spark-submit --conf "spark.executor.memory=4g" file:///opt/estnltk-openstack-spark/named_entity_to_known_entity_matching/nerMatcher.py $tmpManifestFile $knownEntityDataCSV $filesProcessed$filename`
+            `spark-submit --conf "spark.executor.memory=4g" --conf "spark.kryoserializer.buffer.max=1024m" file:///opt/estnltk-openstack-spark/named_entity_to_known_entity_matching/nerMatcher.py -m $tmpManifestFile -k $knownEntityDataCSV -o $filesProcessed$filename --processKnown`
             `rm $tmpManifestFile`;
         fi
     fi
