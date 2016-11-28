@@ -81,23 +81,23 @@ def parseData(line):
     if y == "NO_TEXT":
         return None
     
-    # Named entity labels are often incorrect, so we ignore them for now
-    if flag_ignoreNamedEntityLabels == True and 'named_entity_labels' in y.keys():
-        del y['named_entity_labels']
-    
     # extract from shape {ner:{named_entities:{},named_entity_labels:{}}}
     if not 'named_entities' in y.keys():
         if ('ner' in y.keys()):
             y["named_entities"] = y['ner']['named_entities']
-    if flag_ignoreNamedEntityLabels == False and not 'named_entity_labels' in y.keys():
+    if not 'named_entity_labels' in y.keys():
         if ('ner' in y.keys()):
             y["named_entity_labels"] = y['ner']['named_entity_labels']
 
-    # process hostname::path::date or protocol::hostname:path::params::date                         
-    keyparts = x.split("::")
-    hostname = None
-    path = None
-    date = None
+    # If enabled, preserve name and label pairs for output
+    if flag_doLabelPairOutput:
+        y["nameLabelPairs"] = zip(y["named_entities"], y["named_entity_labels"])
+    
+    # Named entity labels are often incorrect, so we ignore them in matching
+    if flag_ignoreNamedEntityLabels == True and 'named_entity_labels' in y.keys():
+        del y['named_entity_labels']
+    
+    # if enabled, remove names that are subnames of other names on the same page
     if flag_removeSubnames:
         sortedNames = sorted(y["named_entities"],key=unicode.upper)
         filteredNames = []
@@ -113,19 +113,6 @@ def parseData(line):
                 filteredNames.append(oneName)
         y["named_entities"] = filteredNames
     
-    if len(keyparts) == 3:
-        hostname = keyparts[0]
-        path = keyparts[1]
-        date = keyparts[2]
-    elif len(keyparts) == 5:
-        protocol = keyparts[0]
-        hostname = keyparts[1]
-        path = keyparts[2]
-        params = keyparts[3]
-        date = keyparts[4]
-    #y['hostname'] = hostname
-    #y['path'] = path
-    #y['date'] = date
     y["pageId"] = x
     return y
 
@@ -246,29 +233,26 @@ def lemmatizeAndPairWithData(entity,type="org"):
         lemmatizedNames = lemmatizeName(name)
         if name not in lemmatizedNames:
             lemmatizedNames.append(name)
+        # remove duplicates
+        lemmatizedNames = [normalizeName(name, removeShortWords=False) for name in lemmatizedNames]
         nameDataPairs = [((entity[0][0],oneName),entity[1]) for oneName in lemmatizedNames]
-    if (type == "per"):
-        firstName = entity[0][1]
-        lastName = entity[0][2]
-        lemmatizedFirstNames = lemmatizeName(firstName)
-        if firstName not in lemmatizedFirstNames:
-            lemmatizedFirstNames.append(firstName)
-        lemmatizedLastNames = lemmatizeName(lastName)
-        if lastName not in lemmatizedLastNames:
-            lemmatizedLastNames.append(lastName)
-        nameDataPairs = [((entity[0][0],oneFirstName,oneLastName),entity[1]) for oneFirstName in lemmatizedFirstNames for oneLastName in lemmatizedLastNames]
-    return nameDataPairs[0]    
+    #NOTE: PER handling is not implemented
+    return nameDataPairs    
     
 def lemmatizeName(name):
     """
-    Applies NLTK lemmatization to known entity names. Returns a list of name candidates.
+    Applies NLTK lemmatization to known entity names. Returns a list of name alternatives.
     """
-    lemmaList = estnltk.Text(name).lemmas
-    outList = []
-    for oneLemma in lemmaList:
-        outList += explodeStringIntoAlternateForms(oneLemma)
-    return outList
-    
+    lemmaList = estnltk.Text(name).named_entities
+    # If any lemmatized name is shorter than multiplier*len(name), they are name parts.
+    if len(lemmaList) > 1:
+        for part in lemmaList:
+            if len(part) < lemmatizedNamePartMultiplier * len(name):
+                # At least one word is not a proper alternative name, therefore none are. Concatenate them.
+                return [" ".join(lemmaList)]
+    # Otherwise, each lemmatized name is a proper alternative. Return them.
+    return lemmaList
+
 def extractPerFromEntityLineDict(entityDict):
     """
     Returns person data from known entity row dictionary.
@@ -289,16 +273,15 @@ def createKeysFromNames(nerResultDict):
     Splits multiple possibility names (separated by "|").
     """
     named_entities = nerResultDict['named_entities']
-    named_entities = list(set(named_entities))
     namedEntityList = []
-    for oneNameBlock in named_entities: # For each "Myname|Mynamealt"
+    for oneNameBlock in list(set(named_entities)): # For each unqiue "Myname|Mynamealt"
         oneEntity = NamedEntity()
         oneEntity.name = oneNameBlock
-        nameAlternatives = explodeStringIntoAlternateForms(oneNameBlock)
+        nameAlternatives = explodeStringIntoAlternateForms(oneEntity.name)
         normalizedKeys = normalizeNamedEntityKeys(nameAlternatives) # Normalize and remove duplicate keys
         oneEntity.keys = normalizedKeys
         namedEntityList.append(oneEntity)
-    nerResultDict["distinctNames"] = named_entities
+    nerResultDict["distinctNames"] = [oneEntity.name for oneEntity in namedEntityList]
     nerResultDict["normalizedNamedEntities"] = namedEntityList
     return nerResultDict
 
@@ -369,11 +352,8 @@ def performKeyMatching(nerInputDict,knownEntityKeySet_broadcast_PER,knownEntityK
     outputDict["matchfulNamedEntities_ORG"] = matchfulNamedEntities_ORG
     outputDict["matchlessNames"] = matchlessNames
     outputDict["excludedNames"] = excludedNames
-    #outputDict["hostname"] = nerInputDict["hostname"]
-    #outputDict["path"] = nerInputDict["path"]
-    #outputDict["date"] = nerInputDict["date"]
-    #outputDict["normalizedKeys"] = map(lambda oneNamedEntity:oneNamedEntity.keys, normalizedNamedEntities)
-    #outputDict["matchCheckedNamedEntities_ORG"] = map(lambda oneNamedEntity:oneNamedEntity.keys, matchCheckedNamedEntities_ORG)
+    if flag_doLabelPairOutput: 
+        outputDict["nameLabelPairs"] = nerInputDict["nameLabelPairs"]
     return outputDict
         
 def checkMatchExistence(oneNamedEntity, knownNamesColl_broadcast):
@@ -676,7 +656,7 @@ def processKnownEntities():
     # Group line hashes by PER data (each person has a list of hashes of matching lines)
     # result pair : ((per_id, per_firstname, per_lastname), [line_hashes])    
     personData_LineHashes_PairRDD = lineHash_lineDict_PairRDD.map(lambda entity: (extractPerFromEntityLineDict(entity[1]), entity[0]) ).groupByKey()
-    #TODO: lemmatize names
+    # NOTE: Known PER names are not lemmatized
     # Normalize name for PER matching (lowercase with len <3 words removed)
     # result pair : ("firstname lastname", ([ [matching_line_hashes],(per_id,per_firstname,per_lastname) ) ])
     matchableName_HashAndData_PairRDD_PER = personData_LineHashes_PairRDD.map(lambda entity : (normalizeName(u" ".join([ entity[0][1],entity[0][2] ]), removeShortWords=False), (entity[1], entity[0]) ) )
@@ -685,9 +665,8 @@ def processKnownEntities():
     # Group line hashes by ORG data (each organization has a list of hashes of matching lines)
     # result pair : ((org_id, org_name), [line_hashes]) 
     orgData_LineHashes_PairRDD = lineHash_lineDict_PairRDD.map(lambda entity: (extractOrgFromEntityLineDict(entity[1]), entity[0]) ).groupByKey()
-    #TODO: lemmatize names
     if flag_lemmatizeKnownNames:
-        orgData_LineHashes_PairRDD = orgData_LineHashes_PairRDD.map(lambda pair : lemmatizeAndPairWithData(pair, type="org"))
+        orgData_LineHashes_PairRDD = orgData_LineHashes_PairRDD.flatMap(lambda pair : lemmatizeAndPairWithData(pair, type="org"))
     # Normalize name for ORG matching (lowercase with len <3 words removed)
     # result pair : ("orgname", ([ [matching_line_hashes],(org_id,org_name) ) ])    
     matchableName_HashAndData_PairRDD_ORG = orgData_LineHashes_PairRDD.map(lambda entity : (normalizeName( unicode(entity[0][1]) ), ( entity[1], entity[0] ) ))    
@@ -707,6 +686,7 @@ if __name__ == "__main__":
     flag_doAllKnownEntityKeysOutput = False ## if True, output the lists of all known entity keys to data_PER and data_ORG directories 
     flag_ignoreNamedEntityLabels = True ## if True, ignore PER and ORG tags found from NLTK
     flag_doMatchingOutput = False ## If True, output matched/unmatched keys to "/matching" directory
+    flag_doLabelPairOutput = True ## If True, output "name_label_pairs" into main output file
     flag_explodeAlternatives = True ## If True, explode "|"-separated alternative name forms to separate names
     flag_outputExplodedAlternatives = False ## If True, output NLTK-detected names in exploded form. Otherwise, use "|"-separated form. 
     flag_explodeOutputForNames = False ## If True, output into "explodedNames" directory each name on a separate line with page URI
@@ -717,6 +697,7 @@ if __name__ == "__main__":
     #TODO: improve list of filtered words in names
     filteredWords = [u"as",u"kü",u"oü"]
     inputEncoding = "utf-8"
+    lemmatizedNamePartMultiplier = 0.8 # Multiplier for name part threshold in known entity name lemmatization
     
     # List of exclusion file tags: exclude tagged names from unknown name matching 
     excludeTagList = [u"event",u"loc",u"product",u"nan",u"famous_per",u"famous_org"]
@@ -728,7 +709,7 @@ if __name__ == "__main__":
                 \n -o, --out : Output directory. Has to be non-existing.
                 \n -x, --exclude : Directory containing CSV file of names to exclude from unknown entity name matching.
                 \n --processKnown : Read and process known entity data from CSV file(s) in knownEntitiesPath, then save results to knownEntitiesPath/KEDict_PER and KEDict_ORG. If omitted, assume known entities are already processed and read them from knownEntitiesPath/KEDict_PER and KEDict_ORG.  
-                \n --lemmatizeKnown : (EXPERIMENTAL) Performs ESTNLTK lemmatization on known entity names before matching. Implicitly performs --processKnown.
+                \n --lemmatizeKnown : Performs ESTNLTK lemmatization on known entity names before matching. Implicitly performs --processKnown.
                 \n --explodeOutputForNames : For all unknown entity names, output URI-name pairs to explodedNames directory in output directory
                 \n --explodeOutputForMatches : For all successful matches, output URI-match pairs to explodedSuccesses_<type> directories 
                 """
