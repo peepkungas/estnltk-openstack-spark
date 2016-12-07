@@ -143,22 +143,22 @@ def parseEntities(line):
         returnDict["id_PER"] = values[1]
         returnDict["firstName_PER"] = values[2]
         returnDict["lastName_PER"] = values[3]
-        returnDict["birthdDate_PER"] = values[4]
+        returnDict["birthDate_PER"] = cleanDate(values[4])
         returnDict["id_ORG"] = values[5]
         returnDict["name_ORG"] = values[6]
-        returnDict["startDate"] = values[7]
-        returnDict["endDate"] = values[8]
+        returnDict["startDate"] = cleanDate(values[7])
+        returnDict["endDate"] = cleanDate(values[8])
         returnDict["relation"] = values[9]
     elif len(values) == 9:
         # id_per,firstname,lastname,birthdate,id_org,name_org,startdate,enddate,relation
         returnDict["id_PER"] = values[0]
         returnDict["firstName_PER"] = values[1]
         returnDict["lastName_PER"] = values[2]
-        returnDict["birthdDate_PER"] = values[3]
+        returnDict["birthDate_PER"] = cleanDate(values[3])
         returnDict["id_ORG"] = values[4]
         returnDict["name_ORG"] = values[5]
-        returnDict["startDate"] = values[6]
-        returnDict["endDate"] = values[7]
+        returnDict["startDate"] = cleanDate(values[6])
+        returnDict["endDate"] = cleanDate(values[7])
         returnDict["relation"] = values[8]
     else:
         # discard other lines
@@ -167,6 +167,15 @@ def parseEntities(line):
     # add hash of line to uniquely identify line data
     line = line.encode(inputEncoding) 
     return ( hashlib.md5(line).digest(), returnDict )
+    
+def cleanDate(dateString):
+    """
+    Returns None if input is "0000-00-00", unchanged input string otherwise.
+    """
+    if (dateString == "0000-00-00"):
+        return None
+    else:
+        return dateString
     
 def processExcludeRow(oneRow):
     """
@@ -191,26 +200,42 @@ def processExcludeRow(oneRow):
     else:
         return rowDict
 
-def normalizeName(name, removeShortWords=True):
+def normalizeName(name, removeShortWords=True, doSynonymReplace=True):
     """
-    Cleans a name by stripping whitespaces and transforming it into lowercase.
+    Cleans a name by stripping whitespaces and transforming it into lowercase. 
     If removeShortWords==True, words of length 2 or less are removed. Returns None if no words remain, normalized name otherwise.
+    If doSynonymReplace==True, use orgtypeReplaceDict to replace certain words with short-form synonyms.
     """
+    if doSynonymReplace:
+        synonymDict = synonymDict_broadcast.value
     name = name.strip("'")
     name = name.strip('"')
     parts = name.split(" ")
     name = ""
+    replacedSynonym = ""
     for part in parts:
+        part = part.lower()
+        if doSynonymReplace == True:
+            if part in orgtypeReplaceDict.keys():
+                part = orgtypeReplaceDict[part]
+                replacedSynonym = part
+                continue
+            if part in orgtypeReplaceDict.values():
+                replacedSynonym = part
+                continue
+            if part in synonymDict:
+                #part = synonymDict[part]
+                pass
         if len (part) > 2 or removeShortWords==False:
-        #if part not in filteredWords:
             part = part.strip("'")
             part = part.strip('"')
             name = name + " " + part
+    if replacedSynonym != "":
+        name = replacedSynonym.lower() + " " + name.strip()
     name = name.lower().strip()
     if len(name)<=2 and removeShortWords==True:
         return None
     return name
-
     
 def normalizeNamedEntityKeys(namedEntityKeys):
     """
@@ -218,7 +243,7 @@ def normalizeNamedEntityKeys(namedEntityKeys):
     Returns (name,[normalized_keys]).
     """
     keys = namedEntityKeys
-    normalizedKeys = [normalizeName(oneKey) for oneKey in keys]
+    normalizedKeys = [normalizeName(oneKey, removeShortWords=False) for oneKey in keys]
     normalizedKeys = filter(lambda oneKey: oneKey is not None, normalizedKeys)
     normalizedKeys = list(set(normalizedKeys))
     return normalizedKeys
@@ -231,10 +256,11 @@ def lemmatizeAndPairWithData(entity,type="org"):
     if (type == "org"):
         name = entity[0][1]
         lemmatizedNames = lemmatizeName(name)
-        if name not in lemmatizedNames:
-            lemmatizedNames.append(name)
-        # remove duplicates
+        # Also preserve original
+        lemmatizedNames.append(name)
         lemmatizedNames = [normalizeName(name, removeShortWords=False) for name in lemmatizedNames]
+        # remove duplicates after normalization
+        lemmatizedNames = list(set(lemmatizedNames))
         nameDataPairs = [((entity[0][0],oneName),entity[1]) for oneName in lemmatizedNames]
     #NOTE: PER handling is not implemented
     return nameDataPairs    
@@ -243,15 +269,22 @@ def lemmatizeName(name):
     """
     Applies NLTK lemmatization to known entity names. Returns a list of name alternatives.
     """
-    lemmaList = estnltk.Text(name).named_entities
+    lemmaList = estnltk.Text(name).lemmas
+    lemmaList = explodeStringIntoAlternateForms(" ".join(lemmaList))
     # If any lemmatized name is shorter than multiplier*len(name), they are name parts.
-    if len(lemmaList) > 1:
-        for part in lemmaList:
-            if len(part) < lemmatizedNamePartMultiplier * len(name):
-                # At least one word is not a proper alternative name, therefore none are. Concatenate them.
-                return [" ".join(lemmaList)]
-    # Otherwise, each lemmatized name is a proper alternative. Return them.
+#     if len(lemmaList) > 1:
+#         for part in lemmaList:
+#             if len(part) < lemmatizedNamePartMultiplier * len(name):
+#                 # At least one word is not a proper alternative name, therefore none are. Concatenate them.
+#                 outName = " ".join(lemmaList)
+#                 # If too many words have been omitted (the result is too short), ignore the result
+#                 if len(outName) < lemmatizedNamePartMultiplier * len(name):
+#                     return []
+#                 else:
+#                     return [outName]
+#     # Otherwise, each lemmatized name is a proper alternative. Return them.
     return lemmaList
+    
 
 def extractPerFromEntityLineDict(entityDict):
     """
@@ -274,7 +307,7 @@ def createKeysFromNames(nerResultDict):
     """
     named_entities = nerResultDict['named_entities']
     namedEntityList = []
-    for oneNameBlock in list(set(named_entities)): # For each unqiue "Myname|Mynamealt"
+    for oneNameBlock in list(set(named_entities)): # For each unique "Myname|Mynamealt"
         oneEntity = NamedEntity()
         oneEntity.name = oneNameBlock
         nameAlternatives = explodeStringIntoAlternateForms(oneEntity.name)
@@ -573,11 +606,9 @@ def explodeOutputForEachName(matchedInputDict):
     """
     For each detected name, explode into a list of strings in format date::host::path::name. 
     """
-    hostname = matchedInputDict["hostname"]
-    path = matchedInputDict["path"]
-    date = matchedInputDict["date"]
+    pageId = matchedInputDict["pageId"]
     distinctNames = matchedInputDict["distinctNames"]
-    return [hostname + "::" + path + "::" + date + "::" + oneName for oneName in distinctNames]
+    return [pageId + "::" + oneName for oneName in distinctNames]
     
 def explodeOutputForEachInCategory(inputDict,categoryName):
     """
@@ -659,17 +690,21 @@ def processKnownEntities():
     # NOTE: Known PER names are not lemmatized
     # Normalize name for PER matching (lowercase with len <3 words removed)
     # result pair : ("firstname lastname", ([ [matching_line_hashes],(per_id,per_firstname,per_lastname) ) ])
-    matchableName_HashAndData_PairRDD_PER = personData_LineHashes_PairRDD.map(lambda entity : (normalizeName(u" ".join([ entity[0][1],entity[0][2] ]), removeShortWords=False), (entity[1], entity[0]) ) )
+    matchableName_HashAndData_PairRDD_PER = personData_LineHashes_PairRDD.map(lambda entity : (normalizeName(u" ".join([ entity[0][1],entity[0][2] ]), removeShortWords=False,doSynonymReplace=False), (entity[1], entity[0]) ) )
  
     # Extract organization info from known entity lines
     # Group line hashes by ORG data (each organization has a list of hashes of matching lines)
     # result pair : ((org_id, org_name), [line_hashes]) 
     orgData_LineHashes_PairRDD = lineHash_lineDict_PairRDD.map(lambda entity: (extractOrgFromEntityLineDict(entity[1]), entity[0]) ).groupByKey()
-    if flag_lemmatizeKnownNames:
+    if flag_lemmatizeKnownNames: # If enabled, create additional alternative keys for known entities
+#             knownEntityRDD = orgData_LineHashes_PairRDD.map(lambda entity: (entity[0], lemmatizeName(entity[0][1])) )
+#             knownEntityRDD.saveAsTextFile(outputPath + "/known_ORG")
         orgData_LineHashes_PairRDD = orgData_LineHashes_PairRDD.flatMap(lambda pair : lemmatizeAndPairWithData(pair, type="org"))
     # Normalize name for ORG matching (lowercase with len <3 words removed)
-    # result pair : ("orgname", ([ [matching_line_hashes],(org_id,org_name) ) ])    
-    matchableName_HashAndData_PairRDD_ORG = orgData_LineHashes_PairRDD.map(lambda entity : (normalizeName( unicode(entity[0][1]) ), ( entity[1], entity[0] ) ))    
+    # result pair : ("orgname", ([ [matching_line_hashes],(org_id,org_name) ) ])
+    matchableName_HashAndData_PairRDD_ORG = orgData_LineHashes_PairRDD.map(lambda entity : (normalizeName( unicode(entity[0][1]),removeShortWords=False,doSynonymReplace=True ), ( entity[1], entity[0] ) ))
+    if flag_doKnownEntityOutput: # If enabled, output entity and keys to file
+        matchableName_HashAndData_PairRDD_ORG.saveAsTextFile(outputPath + "/known_ORG")
 
     if flag_doAllKnownEntityKeysOutput: ## if true, output all matchable keys to files
         matchableName_HashAndData_PairRDD_PER.groupByKey().map(lambda oneKeyDataPair : textifyKeys_PER(oneKeyDataPair) ).saveAsTextFile(outputPath+"/data_PER")
@@ -687,6 +722,7 @@ if __name__ == "__main__":
     flag_ignoreNamedEntityLabels = True ## if True, ignore PER and ORG tags found from NLTK
     flag_doMatchingOutput = False ## If True, output matched/unmatched keys to "/matching" directory
     flag_doLabelPairOutput = True ## If True, output "name_label_pairs" into main output file
+    flag_doKnownEntityOutput = False ## If True, output known entity name and key values to "/known_<type>" directory
     flag_explodeAlternatives = True ## If True, explode "|"-separated alternative name forms to separate names
     flag_outputExplodedAlternatives = False ## If True, output NLTK-detected names in exploded form. Otherwise, use "|"-separated form. 
     flag_explodeOutputForNames = False ## If True, output into "explodedNames" directory each name on a separate line with page URI
@@ -694,8 +730,10 @@ if __name__ == "__main__":
     flag_lemmatizeKnownNames = False # If True, apply lemmatization to known names before normalizing
     flag_processKnownEntities = False # If True, read from CSV file and process known entity data. Otherwise assume it has been done and read from knownEntityDir.
     flag_removeSubnames = True # If True, ignore each name that is a substring of another name in the same URI location. 
-    #TODO: improve list of filtered words in names
-    filteredWords = [u"as",u"kü",u"oü"]
+    
+    # Word-replacament dictionary to use in name normalization
+    orgtypeReplaceDict = {u"aktsiaselts":u"as", u"korteriühistu":u"kü", u"osaühing":u"oü", u"mittetulundusühing":u"mtü", u"sihtasutus":u"sa"}
+    
     inputEncoding = "utf-8"
     lemmatizedNamePartMultiplier = 0.8 # Multiplier for name part threshold in known entity name lemmatization
     
@@ -779,6 +817,43 @@ if __name__ == "__main__":
     spark = SparkContext(appName="NER_matcher", conf=conf)
 
     ################
+    # Exclusions and synonyms: Process exclusion/synonym files, create exclusion and synonym broadcasts
+    ################
+    print("Excluding from exclusion file...")
+    fromFileExcludeSet = set()
+    synonymDict = {}
+    if (excludePath != ""):
+        excludeFile = spark.textFile(excludePath,use_unicode=True)
+        unfilteredExcludeRDD = excludeFile.map(lambda oneRow : processExcludeRow(oneRow)).filter(lambda oneDict: oneDict is not None)
+        # RDD of names to ignore
+        excludeRDD = unfilteredExcludeRDD.filter(lambda oneDict : oneDict["tag1"] in excludeTagList).map(lambda oneDict : oneDict["name"])      
+        excludeRDD = excludeRDD.map(lambda oneName : normalizeName(oneName, removeShortWords=False,doSynonymReplace=False))
+
+        # (name,synonym) pair RDD
+        synonymRDD = unfilteredExcludeRDD.filter(lambda oneDict : oneDict["tag1"] in synonymTagList).map(lambda oneDict : (oneDict["name"],oneDict["synonym"]) )
+        synonymRDD = synonymRDD.map(lambda onePair : ( normalizeName(onePair[0],removeShortWords=False,doSynonymReplace=False), normalizeName(onePair[1],removeShortWords=False, doSynonymReplace=False) ) )
+        
+        fromFileExcludeSet = set(excludeRDD.collect())
+        synonymDict = synonymRDD.collectAsMap()
+    
+    # Add to general exclusion set
+    excludeSet = set()
+    excludeSet = excludeSet.union(fromFileExcludeSet)
+    
+    # CONSIDER INCLUDING: Remove matchable ORG names from exclude list (may defeat the purpose of exclusions)
+    # May need a clean list of non-excludable names (add to exclusion/synonym file?)
+    #excludeSet = excludeSet.difference(knownEntityKeySet_broadcast_ORG.value)
+    
+    # Broadcast exclusions
+    excludeSet_broadcast = spark.broadcast(excludeSet)
+    
+    # Broadcast synonyms
+    synonymDict_broadcast = spark.broadcast(synonymDict)
+    
+    print ("EXCLUDESET LEN : " + str(len(excludeSet_broadcast.value)))
+    print ("SYNONYMDICT LEN : " + str(len(synonymDict_broadcast.value)))
+
+    ################
     #  Process known entity data into matchable names
     ################
     if flag_processKnownEntities: # Read from CSV, process lines, save to Pickle file
@@ -798,11 +873,11 @@ if __name__ == "__main__":
     print ("Broadcasting known entities...")
     knownEntityKeySet_broadcast_PER = spark.broadcast(set( groupedByName_HashAndData_PairRDD_PER.keys().collect()))
     knownEntityDict_broadcast_PER = spark.broadcast(groupedByName_HashAndData_PairRDD_PER.collectAsMap())
-    groupedByName_HashAndData_PairRDD_PER.unpersist()
+#     groupedByName_HashAndData_PairRDD_PER.unpersist()
     
     knownEntityKeySet_broadcast_ORG = spark.broadcast(set(groupedByName_HashAndData_PairRDD_ORG.keys().collect()))
     knownEntityDict_broadcast_ORG = spark.broadcast(groupedByName_HashAndData_PairRDD_ORG.collectAsMap())
-    groupedByName_HashAndData_PairRDD_ORG.unpersist()
+#     groupedByName_HashAndData_PairRDD_ORG.unpersist()
     print ("Broadcasting done.")
     
     ################
@@ -834,43 +909,13 @@ if __name__ == "__main__":
     # Exclusions : Exclude lone first names
     ################
     print("Excluding first names...")
-    excludeSet = set()
     names = knownEntityKeySet_broadcast_PER.value
     firstnames = [oneName.split(" ")[0] for oneName in names if oneName != None]
     firstnameSet = set(firstnames)
     excludeSet = excludeSet.union(firstnameSet)
-
-    ################
-    # Exclusions and synonyms: Process exclusion/synonym files, create exclusion and synonym broadcasts
-    ################
-    print("Excluding from exclusion file...")
-    fromFileExcludeSet = set()
-    synonymDict = {}
-    if (excludePath != ""):
-        excludeFile = spark.textFile(excludePath,use_unicode=True)
-        unfilteredExcludeRDD = excludeFile.map(lambda oneRow : processExcludeRow(oneRow)).filter(lambda oneDict: oneDict is not None)
-        # RDD of names to ignore
-        excludeRDD = unfilteredExcludeRDD.filter(lambda oneDict : oneDict["tag1"] in excludeTagList).map(lambda oneDict : oneDict["name"])      
-        excludeRDD = excludeRDD.map(lambda oneName : normalizeName(oneName, removeShortWords=False))
-
-        # (name,synonym) pair RDD
-        synonymRDD = unfilteredExcludeRDD.filter(lambda oneDict : oneDict["tag1"] in synonymTagList).map(lambda oneDict : (oneDict["name"],oneDict["synonym"]) )
-        synonymRDD = synonymRDD.map(lambda onePair : ( normalizeName(onePair[0],removeShortWords=False), normalizeName(onePair[1],removeShortWords=False) ) )
-        
-        fromFileExcludeSet = set(excludeRDD.collect())
-        synonymDict = synonymRDD.collectAsMap()
-    
-    # Combine with first name exclusions
-    excludeSet = excludeSet.union(fromFileExcludeSet)
-
     # Broadcast exclusions
     excludeSet_broadcast = spark.broadcast(excludeSet)
     
-    # Broadcast synonyms
-    synonymDict_broadcast = spark.broadcast(synonymDict)
-
-    print ("EXCLUDESET LEN : " + str(len(excludeSet_broadcast.value)))
-    print ("SYNONYMDICT LEN : " + str(len(synonymDict_broadcast.value)))
 
     ################
     # Matching : match each name in each NER result dict to known entities
