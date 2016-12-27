@@ -299,8 +299,15 @@ def extractPerFromEntityLineDict(entityDict):
 def extractOrgFromEntityLineDict(entityDict):
     """
     Returns organization data from known entity row dictionary.
-    Returns (id_ORG,name_ORG) tuple:
+    If PER name exactly matches ORG name, return None.
+    Otherwise return (id_ORG,name_ORG) tuple.
     """
+    name_PER = entityDict["firstName_PER"] + " " + entityDict["lastName_PER"]
+    name_PER = normalizeName(name_PER, removeShortWords=False, doSynonymReplace=False)
+    name_ORG = entityDict["name_ORG"]
+    name_ORG = normalizeName(name_ORG, removeShortWords=False, doSynonymReplace=False)
+    if name_PER == name_ORG:
+        return None
     return (entityDict["id_ORG"],entityDict["name_ORG"])  
 
 def createKeysFromNames(nerResultDict):
@@ -714,7 +721,7 @@ def processKnownEntities():
     # Extract organization info from known entity lines
     # Group line hashes by ORG data (each organization has a list of hashes of matching lines)
     # result pair : ((org_id, org_name), [line_hashes]) 
-    orgData_LineHashes_PairRDD = lineHash_lineDict_PairRDD.map(lambda entity: (extractOrgFromEntityLineDict(entity[1]), entity[0]) ).groupByKey()
+    orgData_LineHashes_PairRDD = lineHash_lineDict_PairRDD.map(lambda entity: (extractOrgFromEntityLineDict(entity[1]), entity[0]) ).filter(lambda onePair : onePair[0] is not None).groupByKey()
     if flag_lemmatizeKnownNames: # If enabled, create additional alternative keys for known entities
 #             knownEntityRDD = orgData_LineHashes_PairRDD.map(lambda entity: (entity[0], lemmatizeName(entity[0][1])) )
 #             knownEntityRDD.saveAsTextFile(outputPath + "/known_ORG")
