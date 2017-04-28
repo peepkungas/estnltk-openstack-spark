@@ -225,6 +225,15 @@ def processSequencePair(key, value):
             '''
         if (outNer == True):
             values = text.get.named_entities.named_entity_labels.as_dict
+            named_entities_with_spans = text.get.named_entities.named_entity_spans.as_dict
+            named_entities_with_origin = []
+            for i in range(len(named_entities_with_spans["named_entities"])):
+				oneNamedEntity = named_entities_with_spans["named_entities"][i]
+				oneSpan = named_entities_with_spans["named_entity_spans"][i]
+				oneOrigin = text.text[oneSpan[0]:oneSpan[1]]
+				returnPair = (oneNamedEntity, oneOrigin)
+				named_entities_with_origin.append(returnPair)
+            values["named_entities_with_origins"] = named_entities_with_origin
             returndict["ner"] = values
             '''
             filepath = outpath + "/ner"
