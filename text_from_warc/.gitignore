@@ -1,0 +1,6 @@
+.project
+.vagrant
+.idea/
+lib/
+target/
+python/
