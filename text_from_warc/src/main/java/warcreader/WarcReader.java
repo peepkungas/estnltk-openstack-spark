@@ -1,9 +1,6 @@
 package warcreader;
 
-import com.typesafe.config.ConfigException;
 import nl.surfsara.warcutils.WarcInputFormat;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -13,21 +10,15 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
-import org.apache.tika.config.TikaConfig;
-import org.apache.tika.detect.Detector;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.io.TaggedIOException;
-import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
-import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.safety.Whitelist;
-import org.jwat.common.HeaderLine;
 import org.jwat.warc.WarcRecord;
 import org.xml.sax.SAXException;
 import scala.Tuple2;
@@ -61,7 +52,6 @@ public class WarcReader {
 
         long start = System.currentTimeMillis();
         logger.info("Starting spark...");
-        //sparkWarcReader(inputPath, outputPath, doOutputSeparation);
         sparkWarcReader(inputPath, outputPath + System.currentTimeMillis());
         logger.info("Spark Finished...");
         long end = System.currentTimeMillis();
@@ -69,17 +59,16 @@ public class WarcReader {
 
     }
 
-    /*  Extracts text content from warc files
+    /*
+     * Extracts text content from warc files
      * inputPath - path to warc file
      * outputPath - path where sequence files are outputted
-     * doOutputSeparation - if true then output is separated into several folders based on Content-Type
     */
     private static void sparkWarcReader(String inputPath, String outputPath) {
 
         // Initialise Spark
-        SparkConf sparkConf = new SparkConf().setAppName("Spark PDF text extraction");
+        SparkConf sparkConf = new SparkConf().setAppName("Warc text extractor");
         JavaSparkContext sc = new JavaSparkContext(sparkConf);
-        // SQLContext sqlContext = new SQLContext(sc);
 
         Configuration hadoopconf = new Configuration();
 
@@ -93,12 +82,33 @@ public class WarcReader {
         JavaPairRDD<Text, Text> records2 = warcRecords
                 .filter(new Function<Tuple2<LongWritable, WarcRecord>, Boolean>() {
                     public Boolean call(Tuple2<LongWritable, WarcRecord> s) throws Exception {
-                        String header = s._2.getHeader("Content-Type").value;
+                        String header = "";
+
+                       /*
+                       Some WARC records do not have Content-Type header, such as
+                       WARC-Type : resource
+                       WARC-Target-URI : metadata://netarkivet.dk/crawl/setup/duplicatereductionjobs?majorversion=1&minorversion=0&harvestid=1&harvestnum=0&jobid=10
+                       WARC-Date : 2015-02-15T21:23:35Z
+                       WARC-Block-Digest : sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709
+                       WARC-Warcinfo-ID : <urn:uuid:4916247c-8bfc-428d-b27d-4a28372dbf73>
+                       WARC-IP-Address : 127.0.1.1
+                       WARC-Record-ID : <urn:uuid:44b27d4f-06d8-46f9-9c18-441d173dd925>
+                       Content-Length : 0
+                       */
+
+                        try {
+                            header = s._2.getHeader("Content-Type").value;
+                        } catch (NullPointerException e) {
+                            return false;
+                        }
 
                         // Ignore WARC and DNS files
                         if (header.equals("application/warc-fields")) return false;
 
                         if (header.equals("text/dns")) return false;
+
+                        if (s._2.getHeader("WARC-Target-URI").value.startsWith("metadata")) return false;
+
 
                         return true;
                     }
@@ -134,12 +144,12 @@ public class WarcReader {
                                 return new Tuple2<Text, Text>(new Text(id), new Text(""));
                             }
                         }
+
                         // Extract text from Warc file
                         try {
                             // Have Tika itself select the parser that matches content
                             AutoDetectParser parser = new AutoDetectParser();
-                            // Minus 1 sets the limit to unlimited
-                            // This is needed for bigger files
+                            // Minus 1 sets the limit to unlimited that is needed for bigger files
                             BodyContentHandler handler = new BodyContentHandler(-1);
                             Metadata metadata = new Metadata();
 
@@ -147,7 +157,6 @@ public class WarcReader {
 
                             parser.parse(is, handler, metadata);
 
-                            // Remove all remaining HTML tags that were not parsed yet.
                             String out = removeHTMLTags(handler.toString());
 
                             logger.debug("finished " + s._1);
@@ -160,22 +169,14 @@ public class WarcReader {
                             } catch (NullPointerException e1) {
 
                             }
-                            logger.error(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
+                            logger.debug(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
                         } catch (SAXException e) {
                             try {
                                 exceptionCause = e.getCause().toString();
                             } catch (NullPointerException e1) {
 
                             }
-                            logger.error(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
-                        } catch (NoSuchMethodError e) {
-                            // A small hack until
-                            // Caused by: java.lang.NoSuchMethodError: org.apache.commons.compress.compressors.CompressorStreamFactory.setDecompressConcat                                                        enated(Z)V
-                            // at org.apache.tika.parser.pkg.CompressorParser.parse(CompressorParser.java:102)
-                            // is resolved
-                            exceptionCause = "UNK Cause";
-                            logger.error(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
-
+                            logger.debug(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
                         } catch (TaggedIOException e) {
                             // With new detection logic this happens
                         }
@@ -189,8 +190,8 @@ public class WarcReader {
         sc.close();
     }
 
+
     private static void saveSingleFolder(JavaPairRDD<Text, Text> rdd, String outputPath, Configuration hadoopconf) {
-        //contents.coalesce(1).saveAsNewAPIHadoopFile(outputPath, String.class, Integer.class, org.apache.hadoop.mapreduce.lib.output.TextOutputFormat.class, hadoopconf);
         rdd.saveAsNewAPIHadoopFile(outputPath, Text.class, Text.class, org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat.class, hadoopconf);
     }
 
@@ -208,48 +209,4 @@ public class WarcReader {
         // Removes all double spaces AND \n
         // return Jsoup.parse(text).text();
     }
-
-    // Method for saving RowRDD, not used currently
-//    private static void saveDF(JavaRDD<Row> javaRDD, SQLContext sqlContext, String outputPath, String dirName) {
-//        List<StructField> fields = new ArrayList<StructField>();
-//        fields.add(DataTypes.createStructField("id", DataTypes.StringType, true));
-//        fields.add(DataTypes.createStructField("contentType", DataTypes.StringType, true));
-//        fields.add(DataTypes.createStructField("content", DataTypes.StringType, true));
-//        StructType schema = DataTypes.createStructType(fields);
-//
-//        DataFrame df = sqlContext.createDataFrame(javaRDD, schema);
-//
-//        // TODO save as into Hbase
-//    }
-
-//    public static void readHbase() throws IOException {
-//        // https://community.hortonworks.com/articles/2038/how-to-connect-to-hbase-11-using-java-apis.html
-//        logger.info("Setting up hbase configuration");
-//        TableName tableName = TableName.valueOf("stock-prices");
-//
-//        Configuration conf = HBaseConfiguration.create();
-//        // Clientport 2181, but docker changes it
-//        conf.set("hbase.zookeeper.property.clientPort", "32779");
-//        conf.set("hbase.zookeeper.quorum", "172.17.0.2");
-//        conf.set("zookeeper.znode.parent", "/hbase");
-//        logger.info("Connecting to hbase");
-//        Connection conn = ConnectionFactory.createConnection(conf);
-//        logger.info("Connected");
-//        Admin admin = conn.getAdmin();
-////        if (!admin.tableExists(tableName)) {
-//        admin.createTable(new HTableDescriptor(tableName).addFamily(new HColumnDescriptor("cf")));
-////        }
-//        logger.info("Inserting into table");
-//        Table table = conn.getTable(tableName);
-//        Put p = new Put(Bytes.toBytes("AAPL10232015"));
-//        p.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("close"), Bytes.toBytes(119));
-//        table.put(p);
-//        logger.info("Inserted");
-//
-//        logger.info("Reading from table");
-//        Result r = table.get(new Get(Bytes.toBytes("AAPL10232015")));
-//        System.out.println(r);
-//    }
 }
-
-
