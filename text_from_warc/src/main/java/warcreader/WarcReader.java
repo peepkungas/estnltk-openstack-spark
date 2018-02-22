@@ -54,6 +54,10 @@ public class WarcReader {
 
         // Initialise Spark
         SparkConf sparkConf = new SparkConf().setAppName("Warc text extractor");
+
+        // Increase Spark network timeout from default 120s
+        sparkConf.set("spark.network.timeout", "1000000");
+
         JavaSparkContext sc = new JavaSparkContext(sparkConf);
 
         Configuration hadoopconf = new Configuration();
