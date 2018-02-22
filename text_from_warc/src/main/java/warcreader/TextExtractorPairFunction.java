@@ -18,6 +18,7 @@ import org.xml.sax.SAXException;
 import scala.Tuple2;
 
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +30,7 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
 
     private static final Logger logger = LogManager.getLogger(TextExtractorPairFunction.class);
 
-    public Tuple2<Text, Text> call(Tuple2<LongWritable, WarcRecord> s) throws Exception {
+    public Tuple2<Text, Text> call(Tuple2<LongWritable, WarcRecord> s) throws MalformedURLException {
         String exceptionCause = "";
 
         logger.debug("reading " + s._1);
@@ -47,12 +48,13 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
         String param = url.getQuery();
 
         String id = protocol + "::" + hostname + "::" + urlpath + "::" + param + "::" + date;
-
         // Ignore files that rarely have any meaningful text
         List<String> ignoreList = new ArrayList<String>();
         ignoreList.add(".css");
         ignoreList.add(".js");
+        ignoreList.add(".ttf");
         ignoreList.add("jquery");
+        // 18/02/10 00:03:32 ERROR warcreader.TextExtractorPairFunction: OutOfMemoryError when parsing http::www.geenivaramu.ee::/tools/dbsnp37.txt.gz::null::20170820170215 Java heap space
         ignoreList.add("robots.txt");
 
         for (String suffix : ignoreList) {
@@ -60,8 +62,6 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
                 return new Tuple2<Text, Text>(new Text(id), new Text(""));
             }
         }
-
-
 
         // Extract text from Warc file
         try {
@@ -71,18 +71,16 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
             BodyContentHandler handler = new BodyContentHandler(-1);
             Metadata metadata = new Metadata();
 
-
-
             InputStream is = s._2.getPayload().getInputStream();
 
             parser.parse(is, handler, metadata);
 
+            // TODO only parse non-html files here
             String out = removeHTMLTags(handler.toString());
 
-            if(s._2.getHeader("WARC-Target-URI").value.contains(".xls")){
-                System.out.println(handler.toString());
-            }
             logger.debug("finished " + s._1);
+
+            is.close();
 
             return new Tuple2<Text, Text>(new Text(id), new Text(out));
 
@@ -92,19 +90,31 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
             } catch (NullPointerException e1) {
 
             }
-            logger.debug(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
+            logger.error(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
         } catch (SAXException e) {
             try {
                 exceptionCause = e.getCause().toString();
             } catch (NullPointerException e1) {
 
             }
-            logger.debug(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
+            logger.error(e.getMessage() + " when parsing " + id + " cause " + exceptionCause);
         } catch (TaggedIOException e) {
             // With new detection logic this happens
+        } catch (Exception e){
+            logger.error("Unhandled exception when parsing " + id + " " + e.getMessage());
+            e.printStackTrace();
+        } catch (StackOverflowError e){
+            logger.error("StackOverflowError when parsing " + id + " " + e.getMessage());
+            e.printStackTrace();
+        } catch (OutOfMemoryError e){
+            logger.error("OutOfMemoryError when parsing " + id + " " + e.getMessage());
+//            e.printStackTrace();
+        } catch (Error e){
+            logger.error("Unhandled error when parsing " + id + " " + e.getMessage());
+            e.printStackTrace();
         }
 
-        return new Tuple2<Text, Text>(new Text("EXCEPTION"), new Text(""));
+        return new Tuple2<Text, Text>(new Text(id), new Text(""));
     }
 
     // Some non-HTML files have HTML tags in them that are not parsed when text is extracted

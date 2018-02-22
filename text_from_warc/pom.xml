@@ -6,13 +6,27 @@
 
     <groupId>Spark</groupId>
     <artifactId>text_from_warc</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
     <dependencies>
         <!-- Apache Spark -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.10</artifactId>
             <version>1.6.0</version>
+            <!--<exclusions>-->
+                <!--<exclusion>-->
+                    <!--<groupId>com.typesafe.akka</groupId>-->
+                    <!--<artifactId>akka-remote_2.10</artifactId>-->
+                <!--</exclusion>-->
+                <!--<exclusion>-->
+                    <!--<groupId>com.typesafe.akka</groupId>-->
+                    <!--<artifactId>akka-actor_2.10</artifactId>-->
+                <!--</exclusion>-->
+                <!--<exclusion>-->
+                    <!--<groupId>com.typesafe.akka</groupId>-->
+                    <!--<artifactId>akka-slf4j_2.10</artifactId>-->
+                <!--</exclusion>-->
+            <!--</exclusions>-->
         </dependency>
         <!-- Apache Tika for reading multiple file types -->
         <dependency>
@@ -50,6 +64,13 @@
             <artifactId>jsoup</artifactId>
             <version>1.9.2</version>
         </dependency>
+        <!-- this is required when using oozie. Stupid oozie, handle your own serialization -->
+        <!--<dependency>-->
+            <!--<groupId>com.fasterxml.jackson.core</groupId>-->
+            <!--<artifactId>jackson-core</artifactId>-->
+            <!--<version>2.9.3</version>-->
+        <!--</dependency>-->
+
 
     </dependencies>
 
@@ -126,6 +147,26 @@
                         <goals>
                             <goal>single</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- https://stackoverflow.com/questions/31011243/no-configuration-setting-found-for-key-akka-version -->
+            <plugin>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.4.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>reference.conf</resource>
+                                </transformer>
+                            </transformers>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
