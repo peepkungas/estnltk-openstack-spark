@@ -1,5 +1,8 @@
 package warcreader;
 
+import org.jwat.warc.WarcRecord;
+import scala.Tuple2;
+//import warcutils.WarcInputFormat;
 import nl.surfsara.warcutils.WarcInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
@@ -9,7 +12,7 @@ import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.jwat.warc.WarcRecord;
+//import jwat.warc.WarcRecord;
 
 import java.io.IOException;
 
@@ -25,6 +28,8 @@ import java.io.IOException;
 public class WarcReader {
 
     private static final Logger logger = LogManager.getLogger(WarcReader.class);
+
+
 
     public static void main(String[] args) throws IOException {
 
@@ -56,32 +61,65 @@ public class WarcReader {
         SparkConf sparkConf = new SparkConf().setAppName("Warc text extractor");
 
         // Increase Spark network timeout from default 120s
-        sparkConf.set("spark.network.timeout", "1000000");
+//        sparkConf.set("spark.network.timeout", "1000000");
 
         JavaSparkContext sc = new JavaSparkContext(sparkConf);
+        sc.setLogLevel("ERROR");
 
         Configuration hadoopconf = new Configuration();
 
         // against java.io.IOException: Filesystem closed
         hadoopconf.setBoolean("fs.hdfs.impl.disable.cache", true);
 
+        // TODO convert jwat.warcreader to use String so that it would be serializable
         //Read in all warc records
         JavaPairRDD<LongWritable, WarcRecord> warcRecords =
                 sc.newAPIHadoopFile(inputPath, WarcInputFormat.class, LongWritable.class, WarcRecord.class, hadoopconf);
 
+        JavaPairRDD<LongWritable, WarcRecord> filteredWarcRecords = warcRecords.filter(new WarcFilter());
+
+//
+//        // make the thing serializable
+//        JavaRDD<Tuple4<String, String, String, String>> serializableWarcRecords = filteredWarcRecords.map(line -> new Tuple4(
+//                line._2.getHeader("WARC-Target-URI").value,
+//                line._2.getHeader("WARC-Date").value,
+//                line._2.getHeader("Content-Type").value,
+//                IOUtils.toString(line._2.getPayload().getInputStream())));
+
+//        serializableWarcRecords.repartition(200);
+
+//        for(Tuple4 line: serializableWarcRecords.take(5)){
+//            System.out.println(line);
+//        }
+
+
         // Extract text from Warc records using TIKA
-        // If hbase is used then JavaRDD<Row> should be used
-        JavaPairRDD<Text, Text> records2 = warcRecords
-                .filter(new WarcTypeFilter())
+        JavaPairRDD<String, String> extractedText = filteredWarcRecords
                 .mapToPair(new TextExtractorPairFunction());
 
-        saveSingleFolder(records2, outputPath, hadoopconf);
+
+        JavaPairRDD<String, String> noEmptyText = extractedText
+                .filter(line -> !line._2.trim().isEmpty());
+
+//        JavaPairRDD<String, Integer> keyCounts = extractedText
+//                .mapToPair(x -> new Tuple2<String, Integer>(x._1,1)).reduceByKey((x, y) -> x + y).sortByKey();
+//
+//
+//        for(Tuple2 line: noEmptyText.collect()){
+////            System.out.println(line);
+//        }
+
+        JavaPairRDD<Text, Text> output = noEmptyText.mapToPair(line -> new Tuple2(new Text(line._1), new Text(line._2)));
+
+        saveSingleFolder(output, outputPath, hadoopconf);
+//        noEmptyText.saveAsObjectFile(outputPath);
 
         sc.close();
     }
 
     private static void saveSingleFolder(JavaPairRDD<Text, Text> rdd, String outputPath, Configuration hadoopconf) {
-        rdd.saveAsNewAPIHadoopFile(outputPath, Text.class, Text.class, org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat.class, hadoopconf);
+        rdd.saveAsNewAPIHadoopFile(outputPath, Text.class, Text.class,
+                org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat.class, hadoopconf);
     }
 
 }
