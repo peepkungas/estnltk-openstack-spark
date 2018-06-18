@@ -2,7 +2,6 @@ package warcreader;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.function.PairFunction;
@@ -10,29 +9,23 @@ import org.apache.tika.exception.TikaException;
 import org.apache.tika.io.IOUtils;
 import org.apache.tika.io.TaggedIOException;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.html.HtmlMapper;
 import org.apache.tika.sax.BodyContentHandler;
+import org.ccil.cowan.tagsoup.HTMLSchema;
+import org.ccil.cowan.tagsoup.Parser;
+import org.ccil.cowan.tagsoup.XMLWriter;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.safety.Whitelist;
-//import jwat.warc.WarcRecord;
 import org.jwat.warc.WarcRecord;
 import org.xml.sax.*;
 import scala.Tuple2;
 
 import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.text.DecimalFormat;
-import java.util.*;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import org.ccil.cowan.tagsoup.HTMLSchema;
-import org.ccil.cowan.tagsoup.Parser;
-import org.ccil.cowan.tagsoup.XMLWriter;
 
 /**
  * Created by Madis-Karli Koppel on 13/12/2017.
@@ -41,10 +34,6 @@ import org.ccil.cowan.tagsoup.XMLWriter;
 public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritable, WarcRecord>, String, String> {
 
     private static final Logger logger = LogManager.getLogger(TextExtractorPairFunction.class);
-
-    private static final Charset ISO = Charset.forName("ISO-8859-1");
-    private static final Charset UTF8 = Charset.forName("UTF-8");
-
 
     // TODO refactor
     public Tuple2<String, String> call(Tuple2<LongWritable, WarcRecord> tuple2) {
@@ -61,7 +50,6 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
         return new Tuple2(id, extractText(id, tuple2._2));
     }
 
-
     private static String extractText(String id, WarcRecord warcRecord){
 
         String exceptionCause = "";
@@ -77,17 +65,23 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
 
             // Have Tika itself select the parser that matches content
             AutoDetectParser parser = new AutoDetectParser();
+
+            // Uncomment to use custom html parser
+            // Add your own custom parsers by content type
+//            Map<MediaType, org.apache.tika.parser.Parser> parsers = parser.getParsers();
+//            parsers.replace(MediaType.text("html"), new CustomHtmlParser());
+//            parsers.replace(MediaType.text("xhtml+xml"), new CustomHtmlParser());
+//            parsers.replace(MediaType.text("vnd.wap.xhtml+xml"), new CustomHtmlParser());
+//            parsers.replace(MediaType.text("x-asp"), new CustomHtmlParser());
+//            parser.setParsers(parsers);
+
             // Minus 1 sets the limit to unlimited that is needed for bigger files
             BodyContentHandler handler = new BodyContentHandler(-1);
+            // force encoding as most of the time tika wrongly detected html encoding
             Metadata metadata = new Metadata();
+            metadata.add("Content-Encoding", "UTF-8");
 
             InputStream is = warcRecord.getPayload().getInputStream();
-
-//            if(id.contains("valitsus.ee")){
-//                String fixedHTML = fixHtml(IOUtils.toString(is));
-//                is = IOUtils.toInputStream(fixedHTML);
-//                logger.error(fixedHTML);
-//            }
 
             parser.parse(is, handler, metadata);
 
@@ -111,35 +105,18 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
 
             String extractedText = handler.toString();
 
-            String out = removeHTMLTags(extractedText, tikaContentType);
+            String out = removeHTMLTags(extractedText);
 
             // ignore files that have more than 1% of their text as {
             int brackets = StringUtils.countMatches(out, "{");
             int total  = out.length();
             double percentage = brackets/(total * 1.0) * 100;
 
-//            if(id.contains("valitsus.ee")){
-//                logger.error(percentage);
-//                // 1035-1-20170821160701848-00002-ciblee_2015_netarchive.warc
-//                printstuff(id, tikaContentType, httpHeader, extractedText, out);
-//            }
-
-
             if (percentage > 1.0){
                 return "";
             }
 
-            // some json files with a lot of text don't fulfill this requirement
-            // but they begin with { and end with }
-            if (out.length() > 0) {
-                if (out.trim().substring(0,1) == "{" || out.trim().substring(0,1) =="["){
-                    logger.error("json stuff");
-                    printstuff(id, tikaContentType, httpHeader, extractedText, out);
-                    return "";
-                }
-            }
-
-            String out_cleaned = out.replaceAll("\n|\\\\n|\t", " ").replaceAll("[ ]{2,}", " ").trim();
+            String out_cleaned = out.replaceAll("[^\\p{javaLetterOrDigit}\\p{Punct}\\s]", "").replaceAll("[ ]{2,}", " ").trim();
 
 //            Set<String> uniqueWords = Arrays.stream(out_cleaned.split(" ")).map(word -> word.toLowerCase()).collect(Collectors.toSet());
 ////            if (uniqueWords.size() > 29 && uniqueWords.size() < 31){
@@ -152,13 +129,8 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
 //                }
 //            }
 
-            is.close();
-
-//            if(httpHeader.contains("binary/octet-stream")){
-//                printstuff(id, tikaContentType, httpHeader, extractedText, out);
-//            }
-
-
+//            logger.error(textContent);
+//            printstuff(id, tikaContentType, httpHeader, extractedText, out_cleaned);
 
             return out_cleaned;
 
@@ -193,9 +165,9 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
         return "";
     }
 
-    private static String removeHTMLTags(String contents, String tikaContentType) {
+    private static String removeHTMLTags(String contents) {
         Document doc = Jsoup.parse(contents);
-        String textContent = doc.text();
+        String textContent = doc.body().text();
         return textContent;
     }
 

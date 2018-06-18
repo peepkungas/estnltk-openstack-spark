@@ -15,32 +15,22 @@ public class Utils {
             "application/x-gzip", "application/x-shockwave-flash", "application/vnd.ms-fontobject", "application/json",
             "application/x-x509-ca-cert", "application/x-javascript", "application/javascript", "application/vnd.javascript",
             "application/font-woff",
-            "application/x-font", "application/image", "application/zip"
+            "application/x-font", "application/image", "application/zip", "binary/octet-stream", "text/x-component"
     };
 
     // what else to check
-    // more than 10 000 occurences
-    // binary/octet-stream
-    // less than 5 000 occurences
-    // text/calendar
-    // text/x-c
     // less than 4 000 occurences
-    // text/x-component
-    // application/force-download
     // application/x-www-form-urlencoded
     // application/vnd.ms-cab-compressed
     // less than 3 000 occurences
-    // application/download
     // text/turtle
     // less than 2 000 occurences
     // application/thumb
-    // application/x-download
     // less than 1 000 occurences
     // application/unknown
     // text/x-vcard
     // application/vnd.google-earth.kml+xml
     // application/x-wais-source
-    // application/x-msdownload
     // less than 500 occurences
     // application/vnd.apple.mpegurl
     // application/save-as
@@ -52,22 +42,16 @@ public class Utils {
     // application/x-rar-compressed
     // application/zip
     // application/vnd.etsi.asic-e+zip
-    // application/x-hot-download
     // application/ogg
     // application/epub+zip
     // application/x-mpegurl
     // httpd/unix-directory
     // application/x-msdos-program
     // application/x-mobipocket-ebook
-    // aplication/force-download
     // application/java-archive
     // application/vnd.google-earth.kmz
     // less than 100
     // application/gzip
-
-
-
-
 
     public static boolean inList(String inputStr, String[] items) {
         inputStr = inputStr.toLowerCase();
