@@ -29,13 +29,14 @@ import java.util.regex.Pattern;
 
 /**
  * Created by Madis-Karli Koppel on 13/12/2017.
+ * Extracts text from WarcRecords
  */
 // TODO refactor
 public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritable, WarcRecord>, String, String> {
 
     private static final Logger logger = LogManager.getLogger(TextExtractorPairFunction.class);
+    private static final boolean useCustomExtractor = true;
 
-    // TODO refactor
     public Tuple2<String, String> call(Tuple2<LongWritable, WarcRecord> tuple2) {
 
         TupleObject idAndUrlpath = Utils.generateID(tuple2._2);
@@ -66,14 +67,17 @@ public class TextExtractorPairFunction implements PairFunction<Tuple2<LongWritab
             // Have Tika itself select the parser that matches content
             AutoDetectParser parser = new AutoDetectParser();
 
-            // Uncomment to use custom html parser
-            // Add your own custom parsers by content type
-//            Map<MediaType, org.apache.tika.parser.Parser> parsers = parser.getParsers();
-//            parsers.replace(MediaType.text("html"), new CustomHtmlParser());
-//            parsers.replace(MediaType.text("xhtml+xml"), new CustomHtmlParser());
-//            parsers.replace(MediaType.text("vnd.wap.xhtml+xml"), new CustomHtmlParser());
-//            parsers.replace(MediaType.text("x-asp"), new CustomHtmlParser());
-//            parser.setParsers(parsers);
+            // Example on how to add your own custom parser to autodetectparser
+            if (useCustomExtractor){
+                // Add your own custom parsers by content type
+                Map<MediaType, org.apache.tika.parser.Parser> parsers = parser.getParsers();
+                parsers.replace(MediaType.text("html"), new CustomHtmlParser());
+                parsers.replace(MediaType.text("xhtml+xml"), new CustomHtmlParser());
+                parsers.replace(MediaType.text("vnd.wap.xhtml+xml"), new CustomHtmlParser());
+                parsers.replace(MediaType.text("x-asp"), new CustomHtmlParser());
+                parser.setParsers(parsers);
+            }
+
 
             // Minus 1 sets the limit to unlimited that is needed for bigger files
             BodyContentHandler handler = new BodyContentHandler(-1);

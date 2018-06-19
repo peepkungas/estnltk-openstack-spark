@@ -27,20 +27,22 @@ import org.ccil.cowan.tagsoup.Parser;
 import org.ccil.cowan.tagsoup.Schema;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.python.core.PyException;
+import org.python.core.PyInteger;
+import org.python.core.PyObject;
+import org.python.util.PythonInterpreter;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.AttributesImpl;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.StringReader;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,6 +50,7 @@ import java.util.regex.Pattern;
 // Source code recreated from a .class file by IntelliJ IDEA
 // (powered by Fernflower decompiler)
 // Modified by Madis-Karli Koppel
+// Parsers HTML and extracts only text: discards html tags, and if possible then also head and footer tags
 
 public class CustomHtmlParser extends AbstractParser {
     private static final long serialVersionUID = 7895315240498733128L;
@@ -56,6 +59,7 @@ public class CustomHtmlParser extends AbstractParser {
     private static final Schema HTML_SCHEMA = new HTMLSchema();
     private static boolean useBoilerPipe = false;
     private static boolean useJsoup = false;
+    private static boolean useDragnet = true;
 
     public CustomHtmlParser() {
     }
@@ -70,13 +74,15 @@ public class CustomHtmlParser extends AbstractParser {
         // kind of hackish but does the job
 
         String contents = IOUtils.toString(stream);
+        String textContent = "";
 
-        if (useJsoup){
+
+        if (useJsoup) {
             Document doc = Jsoup.parse(contents);
-            String textContent = doc.body().text();
+            textContent = doc.body().text();
         }
 
-        if (useBoilerPipe){
+        if (useBoilerPipe) {
             try {
                 TextDocument textDocument = new BoilerpipeSAXInput(new InputSource(new StringReader(contents))).getTextDocument();
                 textContent = CommonExtractors.ARTICLE_EXTRACTOR.getText(textDocument);
@@ -87,48 +93,102 @@ public class CustomHtmlParser extends AbstractParser {
             }
         }
 
-        InputStream s = IOUtils.toInputStream(textContent);
+        if(contents.length() == 0)
+            useDragnet = false;
 
-        AutoDetectReader reader = new AutoDetectReader(new CloseShieldInputStream(s), metadata, LOADER);
+        if (useDragnet) {
+//            try {
+//                PythonInterpreter python = new PythonInterpreter();
+//                python.set("number1", new PyInteger(123));
+//                python.set("number2", new PyInteger(11));
+//                python.exec("number3 = number1+number2");
+//                PyObject number3 = python.get("number3");
+//                System.out.println("val : " + number3.toString());
+//            } catch (PyException e){
+//                e.printStackTrace();
+//            }
+            try {
+                String prg = "# coding=UTF-8\n" +
+                        "from dragnet import extract_content\n" +
+                        "content=\"\"\""+ contents +"\"\"\"\n" +
+                        "extracted = extract_content(content)\n" +
+                        "print unicode(extracted).encode('utf-8')\n";
 
-        try {
-            Charset charset = reader.getCharset();
-            String previous = metadata.get("Content-Type");
-            if (previous == null || previous.startsWith("text/html")) {
-                MediaType type = new MediaType(MediaType.TEXT_HTML, charset);
-                metadata.set("Content-Type", type.toString());
+                BufferedWriter out = new BufferedWriter(new FileWriter("test1.py"));
+                out.write(prg);
+                out.close();
+
+                ProcessBuilder pb = new ProcessBuilder("python", "test1.py");
+                Process p = pb.start();
+
+                // Wait for Python to end
+//                p.waitFor();
+
+                BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                BufferedReader err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+                String output = IOUtils.toString(in);
+                String error = IOUtils.toString(err);
+
+                System.out.println("_1_ " + output);
+                System.out.println("_2_ " + error);
+
+                in.close();
+
+            } catch (Exception e) {
+                System.out.println(e);
             }
-
-            metadata.set("Content-Encoding", charset.name());
-            HtmlMapper mapper = context.get(HtmlMapper.class, new HtmlParserMapper());
-            Parser parser = new Parser();
-            parser.setProperty("http://www.ccil.org/~cowan/tagsoup/properties/schema", HTML_SCHEMA);
-            parser.setFeature("http://www.ccil.org/~cowan/tagsoup/features/ignore-bogons", true);
-            parser.setContentHandler(new XHTMLDowngradeHandler(new HtmlHandler(mapper, handler, metadata)));
-
-            parser.parse(reader.asInputSource());
-        } finally {
-            reader.close();
         }
+
+    InputStream s = IOUtils.toInputStream(textContent);
+
+    AutoDetectReader reader = new AutoDetectReader(new CloseShieldInputStream(s), metadata, LOADER);
+
+        try
+
+    {
+        Charset charset = reader.getCharset();
+        String previous = metadata.get("Content-Type");
+        if (previous == null || previous.startsWith("text/html")) {
+            MediaType type = new MediaType(MediaType.TEXT_HTML, charset);
+            metadata.set("Content-Type", type.toString());
+        }
+
+        metadata.set("Content-Encoding", charset.name());
+        HtmlMapper mapper = context.get(HtmlMapper.class, new HtmlParserMapper());
+        Parser parser = new Parser();
+        parser.setProperty("http://www.ccil.org/~cowan/tagsoup/properties/schema", HTML_SCHEMA);
+        parser.setFeature("http://www.ccil.org/~cowan/tagsoup/features/ignore-bogons", true);
+        parser.setContentHandler(new XHTMLDowngradeHandler(new HtmlHandler(mapper, handler, metadata)));
+
+        // TODO find a way to not call parser and just set the expected output
+        parser.parse(reader.asInputSource());
+    } finally
+
+    {
+        reader.close();
+    }
+}
+
+/**
+ * @deprecated
+ */
+private class HtmlParserMapper implements HtmlMapper {
+    private HtmlParserMapper() {
     }
 
-    /** @deprecated */
-    private class HtmlParserMapper implements HtmlMapper {
-        private HtmlParserMapper() {
-        }
-
-        public String mapSafeElement(String name) {
-            return DefaultHtmlMapper.INSTANCE.mapSafeElement(name);
-        }
-
-        public boolean isDiscardElement(String name) {
-            return DefaultHtmlMapper.INSTANCE.isDiscardElement(name);
-        }
-
-        public String mapSafeAttribute(String elementName, String attributeName) {
-            return DefaultHtmlMapper.INSTANCE.mapSafeAttribute(elementName,attributeName);
-        }
+    public String mapSafeElement(String name) {
+        return DefaultHtmlMapper.INSTANCE.mapSafeElement(name);
     }
+
+    public boolean isDiscardElement(String name) {
+        return DefaultHtmlMapper.INSTANCE.isDiscardElement(name);
+    }
+
+    public String mapSafeAttribute(String elementName, String attributeName) {
+        return DefaultHtmlMapper.INSTANCE.mapSafeAttribute(elementName, attributeName);
+    }
+}
 }
 
 // Nothing is changed below
@@ -141,7 +201,7 @@ class XHTMLDowngradeHandler extends ContentHandlerDecorator {
         String upper = localName.toUpperCase(Locale.ENGLISH);
         AttributesImpl attributes = new AttributesImpl();
 
-        for(int i = 0; i < atts.getLength(); ++i) {
+        for (int i = 0; i < atts.getLength(); ++i) {
             String auri = atts.getURI(i);
             String local = atts.getLocalName(i);
             String qname = atts.getQName(i);
@@ -164,7 +224,6 @@ class XHTMLDowngradeHandler extends ContentHandlerDecorator {
     public void endPrefixMapping(String prefix) {
     }
 }
-
 
 
 class HtmlHandler extends TextContentHandler {
@@ -289,7 +348,7 @@ class HtmlHandler extends TextContentHandler {
 
             AttributesImpl newAttributes = new AttributesImpl(atts);
 
-            for(int att = 0; att < newAttributes.getLength(); ++att) {
+            for (int att = 0; att < newAttributes.getLength(); ++att) {
                 String attrName = newAttributes.getLocalName(att);
                 String normAttrName = this.mapper.mapSafeAttribute(name, attrName);
                 if (normAttrName == null) {
