@@ -1,2 +1,9 @@
 .project
 .vagrant
+spark_estnltk/spark_estnltk/metastore_db/
+spark_estnltk/spark_estnltk/.idea/misc.xml
+spark_estnltk/spark_estnltk/.idea/
+
+\.idea/
+
+*.iml
